@@ -906,6 +906,7 @@ const SEED_ATHLETES = [
       gefuehl:"Aggressivität spüren / Druck spüren / ich fühle mich geladen",
       coachKommentar:"",
     },
+    soll:{technik:8,physis:7,psyche:9,material:8},
     sollText:{
       technik:"Direkte Linie / passendes Timing",
       physis:"Muskeltonus ist erhöht / spritzig fühlen",
@@ -992,12 +993,14 @@ function normalizeTeam(t){
   });
   delete t.coach;
   SEED_ATHLETES.forEach(sa=>{
-    const schonDa = Object.values(t.athleten).some(A=>
+    const vorhanden = Object.values(t.athleten).find(A=>
       (A.profile.vorname||"").trim().toLowerCase()===sa.profile.vorname.toLowerCase() &&
       (A.profile.name||"").trim().toLowerCase()===sa.profile.name.toLowerCase());
-    if(!schonDa){
+    if(!vorhanden){
       let n=1; while(t.athleten["a"+n]) n++;
       t.athleten["a"+n] = Object.assign(defaultAthlete(), JSON.parse(JSON.stringify(sa)));
+    } else if(sa.soll && Object.values(vorhanden.soll).every(v=>v===5)){
+      vorhanden.soll = Object.assign({}, vorhanden.soll, sa.soll);
     }
   });
   if(t.session === undefined) t.session = null;
