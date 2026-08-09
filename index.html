@@ -288,6 +288,9 @@
   .set-status{flex:none;font-size:10.5px;font-weight:700;border-radius:999px;padding:3px 9px;color:var(--muted);background:var(--field);text-decoration:none}
   .set-status.aktiv{color:var(--good);background:color-mix(in srgb,var(--good) 12%,var(--surface))}
   .set-status.offen{color:var(--gold-dark);background:var(--gold-soft)}
+  .set-row-wrap.offen{background:var(--field);border-radius:10px;padding:2px 8px;margin:4px -8px}
+  .set-edit{padding:2px 2px 12px}
+  .set-row .nm{cursor:pointer}
   .set-row button{
     flex:none;border:1px solid var(--hairline);background:var(--surface);
     font:inherit;font-size:11px;font-weight:700;color:var(--crit);
@@ -801,20 +804,8 @@
   <section>
     <div class="sec-label">Settings</div>
     <h2>Profil</h2>
-    <div class="ava-row">
-      <span class="avatar big" id="avaPreview"></span>
-      <div class="ava-btns">
-        <button onclick="document.getElementById('fotoInput').click()">Profilbild wählen</button>
-        <input type="file" id="fotoInput" accept="image/*" hidden onchange="setFoto(event)">
-        <button onclick="removeFoto()">Bild entfernen</button>
-      </div>
-    </div>
-    <div class="grid2">
-      <div><label class="f">Name</label><input type="text" data-bind="profile.name" class="af"></div>
-      <div><label class="f">Vorname</label><input type="text" data-bind="profile.vorname" class="af"></div>
-      <div><label class="f">Team</label><input type="text" data-bind="profile.team" class="af"></div>
-      <div><label class="f">Saison</label><input type="text" data-bind="profile.saison" class="af" placeholder="2026/27"></div>
-    </div>
+    <div id="profilBody"></div>
+    <input type="file" id="fotoInput" accept="image/*" hidden onchange="setFoto(event)">
   </section>
   <section id="phasenSection">
     <div class="sec-label">Team Settings</div>
@@ -1260,6 +1251,7 @@ const TR = {
 "GoalsFORGold · Zielvereinbarung für Athlet:innen und Coaches · basiert auf dem Zielvereinbarungsblatt und dem Flow-Prinzip (Csíkszentmihályi)":["GoalsFORGold · Convention d'objectifs pour athlètes et coachs · basée sur la feuille d'objectifs et le principe du flow (Csíkszentmihályi)","GoalsFORGold · Goal agreement for athletes and coaches · based on the goal-setting sheet and the flow principle (Csíkszentmihályi)"],
 "Datum":["Date","Date"],
 "Sprache":["Langue","Language"],
+"Zum Bearbeiten antippen":["Toucher pour modifier","Tap to edit"],
 };
 /* Muster mit variablen Teilen */
 const TR_RX = [
@@ -1271,6 +1263,7 @@ const TR_RX = [
 [/^Was genau heisst das für (.+)\? In eigenen Worten …$/, "Concrètement, ça veut dire quoi pour $1 ? Avec tes mots …", "What exactly does this mean for $1? In your own words …"],
 [/^(.+) – Verhältnis der Summen aus dem IST-Zustand, ein Kreis pro Bereich \(wie in der Vorlage\)\.$/, "$1 – rapport des sommes de l'état actuel, un cercle par domaine.", "$1 – ratio of the current-state sums, one circle per area."],
 [/^Stärken (\d+) · Entwicklung (\d+)$/, "Forces $1 · Développement $2", "Strengths $1 · Development $2"],
+[/^Angemeldet als (.+)$/, "Connecté en tant que $1", "Signed in as $1"],
 ];
 function tr(str){
   if(LANG === "de" || !str) return str;
@@ -1361,9 +1354,11 @@ async function cloudEnter(){
     await sb.auth.signOut();
     return;
   }
-  cloudCtx = { role: mem.role, athleteKey: mem.athlete_key, teamId: mem.team_id, userId: user.id };
+  cloudCtx = { role: mem.role, athleteKey: mem.athlete_key, teamId: mem.team_id, userId: user.id, email: (user.email||"").toLowerCase() };
   await cloudPull(true);
-  T.session = mem.role === "coach" ? { type: "coach" } : { type: "athlet", id: mem.athlete_key };
+  T.session = mem.role === "coach"
+    ? { type: "coach", email: (user.email||"").toLowerCase() }
+    : { type: "athlet", id: mem.athlete_key };
   if(mem.role === "athlet" && !T.athleten[mem.athlete_key]){
     err("Dein Datensatz wurde nicht gefunden – bitte beim Coach melden.");
     await sb.auth.signOut(); T.session = null; return;
@@ -1476,7 +1471,7 @@ async function loginSubmit(){
     if(p1.length<6) return err("Passwort: mindestens 6 Zeichen.");
     if(p1!==p2) return err("Die Passwörter stimmen nicht überein.");
     T.coaches.push({email:email, pw:await hashPw(p1)});
-    T.session = {type:"coach"}; save(); enterApp(); return;
+    T.session = {type:"coach", email:email}; save(); enterApp(); return;
   }
   if(loginMode==="athletsetup"){
     const p1=$("loginPwNeu").value, p2=$("loginPwNeu2").value;
@@ -1507,7 +1502,7 @@ async function loginSubmit(){
     const h = await hashPw($("loginPw").value||"");
     if(h !== konto.pw) return err("Falsches Passwort.");
   }
-  T.session = isCoach ? {type:"coach"} : {type:"athlet", id:hit[0]};
+  T.session = isCoach ? {type:"coach", email:email} : {type:"athlet", id:hit[0]};
   save(); enterApp();
 }
 function enterApp(){
@@ -1596,14 +1591,19 @@ function setFoto(ev){
     const c=document.createElement("canvas");
     c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
     c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-    S.profile.foto=c.toDataURL("image/jpeg",.85);
+    const ziel = profilFotoTarget();
+    if(ziel){ ziel.foto = c.toDataURL("image/jpeg",.85); }
     URL.revokeObjectURL(img.src);
-    save(); refreshAvatars();
+    save(); refreshAvatars(); renderProfil();
   };
   img.src=URL.createObjectURL(f);
   ev.target.value="";
 }
-function removeFoto(){ delete S.profile.foto; save(); refreshAvatars(); }
+function removeFoto(){
+  const ziel = profilFotoTarget();
+  if(ziel) delete ziel.foto;
+  save(); refreshAvatars(); renderProfil();
+}
 
 /* ---------- SOLL ---------- */
 function renderSoll(){
@@ -1971,7 +1971,65 @@ function createAthlet(){
   cloudUpsertAthlet(id);
   window.location.href = inviteMailto(A);   // Einladung im Mailprogramm öffnen
 }
+function coachProfil(){
+  const email = ((T.session && T.session.email) || "").toLowerCase();
+  T.config.coachProfiles = T.config.coachProfiles || {};
+  if(!email) return null;
+  return T.config.coachProfiles[email] = T.config.coachProfiles[email] || {vorname:"", name:"", foto:""};
+}
+function profilFotoTarget(){
+  if(T.session && T.session.type === "coach"){ return coachProfil(); }
+  return S.profile;
+}
+function coachAvatarHtml(P){
+  if(P && P.foto) return `<img src="${P.foto}" alt="">`;
+  const ini = (((P&&P.vorname)||"")[0]||"") + (((P&&P.name)||"")[0]||"");
+  return esc(ini.toUpperCase()||"C");
+}
+function coachProfilEdit(field, val){
+  const P = coachProfil(); if(!P) return;
+  P[field] = val; save();
+}
+function renderProfil(){
+  const box = document.getElementById("profilBody");
+  if(!box) return;
+  const isCoach = T.session && T.session.type === "coach";
+  if(isCoach){
+    const P = coachProfil();
+    const email = (T.session.email||"");
+    box.innerHTML = `
+      <div class="ava-row">
+        <span class="avatar big">${coachAvatarHtml(P)}</span>
+        <div class="ava-btns">
+          <button onclick="document.getElementById('fotoInput').click()">Profilbild wählen</button>
+          <button onclick="removeFoto()">Bild entfernen</button>
+        </div>
+      </div>
+      <div class="grid2">
+        <div><label class="f">Vorname</label><input type="text" value="${esc(P?P.vorname:"")}" oninput="coachProfilEdit('vorname',this.value)"></div>
+        <div><label class="f">Name</label><input type="text" value="${esc(P?P.name:"")}" oninput="coachProfilEdit('name',this.value)"></div>
+      </div>
+      <div class="rollehinweis">Angemeldet als ${esc(email||"Coach")}</div>`;
+  } else {
+    const pr = S.profile;
+    box.innerHTML = `
+      <div class="ava-row">
+        <span class="avatar big">${avatarHtml(S)}</span>
+        <div class="ava-btns">
+          <button onclick="document.getElementById('fotoInput').click()">Profilbild wählen</button>
+          <button onclick="removeFoto()">Bild entfernen</button>
+        </div>
+      </div>
+      <div class="grid2">
+        <div><label class="f">Name</label><input type="text" value="${esc(pr.name)}" oninput="S.profile.name=this.value;save();updateTitle()"></div>
+        <div><label class="f">Vorname</label><input type="text" value="${esc(pr.vorname)}" oninput="S.profile.vorname=this.value;save();updateTitle()"></div>
+        <div><label class="f">Team</label><input type="text" value="${esc(pr.team)}" oninput="S.profile.team=this.value;save();updateTitle()"></div>
+        <div><label class="f">Saison</label><input type="text" value="${esc(pr.saison)}" placeholder="2026/27" oninput="S.profile.saison=this.value;save();updateTitle()"></div>
+      </div>`;
+  }
+}
 function renderSettings(){
+  renderProfil();
   renderPhasen();
   $("settingsList").innerHTML = Object.keys(T.athleten).map(id=>{
     const A=T.athleten[id];
@@ -1982,12 +2040,40 @@ function renderSettings(){
       : (A.profile.email
           ? `<a class="set-status offen" href="${inviteMailto(A)}">Einladung senden</a>`
           : `<span class="set-status">Keine E-Mail</span>`);
-    return `<div class="set-row">
-      <div class="nm">${esc(athletName(A))}${team}${mail}</div>
-      ${status}
-      <button onclick="delAthlet('${id}')">Entfernen</button>
+    const offen = settingsOpenId===id;
+    const editor = offen ? `
+      <div class="set-edit">
+        <div class="grid2">
+          <div><label class="f">Vorname</label><input type="text" value="${esc(A.profile.vorname)}" oninput="athProfilEdit('${id}','vorname',this.value)"></div>
+          <div><label class="f">Name</label><input type="text" value="${esc(A.profile.name)}" oninput="athProfilEdit('${id}','name',this.value)"></div>
+          <div><label class="f">Team</label><input type="text" value="${esc(A.profile.team)}" oninput="athProfilEdit('${id}','team',this.value)"></div>
+          <div><label class="f">Saison</label><input type="text" value="${esc(A.profile.saison)}" oninput="athProfilEdit('${id}','saison',this.value)"></div>
+        </div>
+        <label class="f">E-Mail-Adresse</label>
+        <input type="email" value="${esc(A.profile.email||"")}" oninput="athProfilEdit('${id}','email',this.value)">
+      </div>` : "";
+    return `<div class="set-row-wrap ${offen?"offen":""}">
+      <div class="set-row">
+        <div class="nm" onclick="toggleAthProfil('${id}')">${esc(athletName(A))}${team}${mail}</div>
+        ${status}
+        <button onclick="delAthlet('${id}')">Entfernen</button>
+      </div>
+      ${editor}
     </div>`;
   }).join("");
+}
+let settingsOpenId = null;
+function toggleAthProfil(id){
+  settingsOpenId = settingsOpenId===id ? null : id;
+  renderSettings();
+}
+let athPushT = null;
+function athProfilEdit(id, field, val){
+  T.athleten[id].profile[field] = field==="email" ? val.trim().toLowerCase() : val;
+  save();
+  clearTimeout(athPushT);
+  athPushT = setTimeout(()=>cloudUpsertAthlet(id), 900);
+  if(id===T.activeId) updateTitle();
 }
 
 /* ---------- Team-Übersicht ---------- */
