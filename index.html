@@ -632,6 +632,7 @@
     <div class="login-err" id="loginErr"></div>
     <button class="login-btn" id="loginBtn" onclick="loginSubmit()">Anmelden</button>
     <button class="login-alt" id="coachSetupBtn" onclick="coachSetupMode()" hidden>Coach-Konto einrichten</button>
+    <button class="login-alt" id="registerBtn" onclick="athletSetupMode()" hidden>Neu hier? Mit dieser E-Mail als Athlet:in registrieren</button>
     <div class="login-hint">Athlet:innen melden sich mit der E-Mail-Adresse aus der Einladung an und setzen beim ersten Mal ihr eigenes Passwort.</div>
   </div>
 </div>
@@ -1071,9 +1072,12 @@ function renderLoginMode(){
   $("pwBlock").hidden = loginMode!=="login";
   $("pwSetBlock").hidden = loginMode==="login";
   $("loginBtn").textContent = loginMode==="login" ? "Anmelden" :
-    (loginMode==="coachsetup" ? "Coach-Konto erstellen" : "Passwort setzen & anmelden");
+    (loginMode==="coachsetup" ? "Coach-Konto erstellen" :
+     (loginMode==="athletsetup" ? "Registrieren & anmelden" : "Passwort setzen & anmelden"));
   $("loginTitle").textContent = loginMode==="coachsetup" ? "Coach-Konto einrichten" :
-    (loginMode==="set" ? "Willkommen! Setze dein Passwort" : "Anmelden");
+    (loginMode==="athletsetup" ? "Als Athlet:in registrieren" :
+     (loginMode==="set" ? "Willkommen! Setze dein Passwort" : "Anmelden"));
+  if(loginMode!=="login") $("registerBtn").hidden = true;
 }
 function updateLoginView(){
   const gesperrt = !T.session;
@@ -1081,11 +1085,13 @@ function updateLoginView(){
   document.body.classList.toggle("locked", gesperrt);
   if(gesperrt){
     $("coachSetupBtn").hidden = T.coaches.length > 0;
+    $("registerBtn").hidden = true;
     $("loginErr").textContent = "";
     renderLoginMode();
   }
 }
 function coachSetupMode(){ loginMode="coachsetup"; renderLoginMode(); }
+function athletSetupMode(){ loginMode="athletsetup"; renderLoginMode(); }
 async function loginSubmit(){
   const err = t => { $("loginErr").textContent = t; };
   const email = ($("loginEmail").value||"").trim().toLowerCase();
@@ -1097,10 +1103,24 @@ async function loginSubmit(){
     T.coaches.push({email:email, pw:await hashPw(p1)});
     T.session = {type:"coach"}; save(); enterApp(); return;
   }
+  if(loginMode==="athletsetup"){
+    const p1=$("loginPwNeu").value, p2=$("loginPwNeu2").value;
+    if(p1.length<6) return err("Passwort: mindestens 6 Zeichen.");
+    if(p1!==p2) return err("Die Passwörter stimmen nicht überein.");
+    let n=1; while(T.athleten["a"+n]) n++;
+    const A=defaultAthlete();
+    A.profile.email=email; A.pw=await hashPw(p1);
+    T.athleten["a"+n]=A; ensurePhasenKeys(T);
+    T.session={type:"athlet", id:"a"+n};
+    save(); enterApp(); return;
+  }
   const coachHit = T.coaches.find(c=>(c.email||"").toLowerCase()===email);
   const isCoach = !!coachHit;
   const hit = Object.entries(T.athleten).find(([id,A])=>(A.profile.email||"").toLowerCase()===email);
-  if(!isCoach && !hit) return err("Diese E-Mail ist nicht registriert. Frag deinen Coach nach einer Einladung.");
+  if(!isCoach && !hit){
+    $("registerBtn").hidden = false;
+    return err("Diese E-Mail ist auf diesem Gerät nicht registriert.");
+  }
   const konto = isCoach ? coachHit : hit[1];
   if(!konto.pw){
     if(loginMode!=="set"){ loginMode="set"; renderLoginMode(); return err(""); }
@@ -1539,15 +1559,21 @@ function phasenEdit(typ,i,field,val){
   renderMass(); renderCps();
   $("radarCp").dataset.init="";
 }
+function appUrl(){
+  return location.protocol.startsWith("http")
+    ? location.origin + location.pathname
+    : "https://bbruhhin.github.io/goalsforgold/";
+}
 function inviteMailto(A){
   const betreff = encodeURIComponent("Einladung zu GoalsFORGold – " + (A.profile.team||"dein Team"));
   const text = encodeURIComponent(
     "Hallo " + (A.profile.vorname||"") + "\n\n" +
     "dein Coach hat dich zu GoalsFORGold eingeladen (Team " + (A.profile.team||"–") + ", Saison " + (A.profile.saison||"–") + ").\n\n" +
     "So gehts:\n" +
-    "1. Öffne die GoalsFORGold-App, die dir dein Coach bereitstellt.\n" +
+    "1. Öffne GoalsFORGold: " + appUrl() + "\n" +
     "2. Melde dich mit dieser E-Mail-Adresse an: " + A.profile.email + "\n" +
     "3. Setze beim ersten Login dein persönliches Passwort.\n\n" +
+    "Tipp: Über das Teilen-Menü kannst du die App auf deinem Home-Bildschirm speichern.\n\n" +
     "Sportliche Grüsse\nDein Coach");
   return "mailto:" + encodeURIComponent(A.profile.email) + "?subject=" + betreff + "&body=" + text;
 }
