@@ -64,7 +64,134 @@
     background:var(--page);color:var(--ink);
     line-height:1.45;font-size:13.5px;
   }
-  /* ---------- Info-Animation ---------- */
+  /* =====================================================================
+   Cloud-Backend (Supabase) – aktiv, sobald URL und Key eingetragen sind.
+   Ohne Konfiguration läuft die App wie bisher rein lokal.
+   ===================================================================== */
+const BACKEND = {
+  url: "",       // z. B. "https://abcdefgh.supabase.co"
+  anonKey: "",   // "anon public" Key aus Project Settings → API
+};
+const CLOUD = () => !!(BACKEND.url && BACKEND.anonKey);
+let sb = null, cloudCtx = null, cloudPushT = null, lastPull = 0;
+
+function loadSupabase(){
+  return new Promise((res, rej)=>{
+    if(window.supabase) return res();
+    const sc = document.createElement("script");
+    sc.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+    sc.onload = res; sc.onerror = rej;
+    document.head.appendChild(sc);
+  });
+}
+async function cloudInit(){
+  await loadSupabase();
+  sb = window.supabase.createClient(BACKEND.url, BACKEND.anonKey);
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){ await cloudEnter(); }
+  else { T.session = null; updateLoginView(); }
+}
+async function cloudLogin(){
+  const err = t => { $("loginErr").textContent = t; };
+  const email = ($("loginEmail").value||"").trim().toLowerCase();
+  if(!email) return err("Bitte E-Mail-Adresse eingeben.");
+  if(loginMode === "athletsetup"){
+    const p1 = $("loginPwNeu").value, p2 = $("loginPwNeu2").value;
+    if(p1.length < 6) return err("Passwort: mindestens 6 Zeichen.");
+    if(p1 !== p2) return err("Die Passwörter stimmen nicht überein.");
+    const { data, error } = await sb.auth.signUp({ email, password: p1 });
+    if(error) return err(error.message);
+    if(data.session){ await cloudEnter(); return; }
+    loginMode = "login"; renderLoginMode();
+    return err("Bestätigungs-E-Mail gesendet – bitte Posteingang prüfen und danach anmelden.");
+  }
+  const { error } = await sb.auth.signInWithPassword({ email, password: $("loginPw").value||"" });
+  if(error){
+    $("registerBtn").hidden = false;
+    return err("Anmeldung fehlgeschlagen – falsches Passwort oder noch kein Konto.");
+  }
+  await cloudEnter();
+}
+async function cloudEnter(){
+  const err = t => { $("loginErr").textContent = t; };
+  const { data:{ user } } = await sb.auth.getUser();
+  const { data: mem } = await sb.from("members").select("role,athlete_key,team_id").eq("user_id", user.id).maybeSingle();
+  if(!mem){
+    err("Konto erstellt, aber noch keinem Team zugeordnet – dein Coach muss dich mit dieser E-Mail als Athlet:in anlegen.");
+    await sb.auth.signOut();
+    return;
+  }
+  cloudCtx = { role: mem.role, athleteKey: mem.athlete_key, teamId: mem.team_id, userId: user.id };
+  await cloudPull(true);
+  T.session = mem.role === "coach" ? { type: "coach" } : { type: "athlet", id: mem.athlete_key };
+  if(mem.role === "athlet" && !T.athleten[mem.athlete_key]){
+    err("Dein Datensatz wurde nicht gefunden – bitte beim Coach melden.");
+    await sb.auth.signOut(); T.session = null; return;
+  }
+  save(); enterApp();
+}
+async function cloudPull(initial){
+  lastPull = Date.now();
+  const { data: team } = await sb.from("teams").select("id,config").eq("id", cloudCtx.teamId).maybeSingle();
+  const { data: rows } = await sb.from("athletes").select("key,data").order("key");
+  if(rows && rows.length){
+    T.athleten = {};
+    rows.forEach(r => { T.athleten[r.key] = Object.assign(defaultAthlete(), r.data || {}); });
+    if(team && team.config) T.config = team.config;
+  } else if(initial && cloudCtx.role === "coach"){
+    // Erst-Migration: lokales Team in die Cloud hochladen
+    await cloudPushAll();
+  }
+  if(!T.athleten[T.activeId]) T.activeId = Object.keys(T.athleten)[0];
+  S = T.athleten[T.activeId] || (T.athleten.a1 = defaultAthlete());
+  syncPhasen(); ensurePhasenKeys(T);
+  initAll();
+}
+async function cloudPushAll(){
+  const rows = Object.entries(T.athleten).map(([key, A]) => ({
+    team_id: cloudCtx.teamId, key,
+    email: (A.profile.email||"").toLowerCase() || null,
+    data: A, updated_at: new Date().toISOString(),
+  }));
+  if(rows.length) await sb.from("athletes").upsert(rows, { onConflict: "team_id,key" });
+  await sb.from("teams").update({ config: T.config, updated_at: new Date().toISOString() }).eq("id", cloudCtx.teamId);
+}
+function cloudSchedulePush(){
+  if(!CLOUD() || !cloudCtx) return;
+  clearTimeout(cloudPushT);
+  cloudPushT = setTimeout(async ()=>{
+    const key = T.activeId, A = T.athleten[key];
+    if(!A) return;
+    await sb.from("athletes").upsert({
+      team_id: cloudCtx.teamId, key,
+      email: (A.profile.email||"").toLowerCase() || null,
+      data: A, updated_at: new Date().toISOString(),
+    }, { onConflict: "team_id,key" });
+    if(cloudCtx.role === "coach")
+      await sb.from("teams").update({ config: T.config, updated_at: new Date().toISOString() }).eq("id", cloudCtx.teamId);
+  }, 900);
+}
+async function cloudDeleteAthlet(key){
+  if(!CLOUD() || !cloudCtx) return;
+  await sb.from("athletes").delete().eq("team_id", cloudCtx.teamId).eq("key", key);
+}
+async function cloudUpsertAthlet(key){
+  if(!CLOUD() || !cloudCtx) return;
+  const A = T.athleten[key]; if(!A) return;
+  await sb.from("athletes").upsert({
+    team_id: cloudCtx.teamId, key,
+    email: (A.profile.email||"").toLowerCase() || null,
+    data: A, updated_at: new Date().toISOString(),
+  }, { onConflict: "team_id,key" });
+}
+// Beim Zurückkehren in die App frische Daten holen
+document.addEventListener("visibilitychange", ()=>{
+  if(!document.hidden && CLOUD() && cloudCtx && Date.now() - lastPull > 20000){
+    cloudPull(false);
+  }
+});
+
+/* ---------- Info-Animation ---------- */
   #infoModal{
     position:fixed;inset:0;z-index:90;overflow:auto;
     background:rgba(8,8,9,.96);display:grid;place-items:center;padding:20px 14px;
@@ -1032,7 +1159,11 @@ function load(){
   return defaultState();
 }
 let saveT;
-function save(){ clearTimeout(saveT); saveT=setTimeout(()=>localStorage.setItem(STORE_KEY, JSON.stringify(T)),150); }
+function save(){
+  clearTimeout(saveT);
+  saveT = setTimeout(()=>localStorage.setItem(STORE_KEY, JSON.stringify(T)), 150);
+  cloudSchedulePush();
+}
 function athletName(A){
   const p=A.profile;
   return `${p.vorname||""} ${p.name||""}`.trim() || "Ohne Name";
@@ -1045,6 +1176,7 @@ function delAthlet(id){
   if(Object.keys(T.athleten).length<=1){ alert("Die letzte Athletin kann nicht gelöscht werden."); return; }
   if(!confirm(`${athletName(T.athleten[id])} wirklich entfernen? Die Daten gehen verloren (vorher exportieren!).`)) return;
   delete T.athleten[id];
+  cloudDeleteAthlet(id);
   if(T.activeId===id) T.activeId=Object.keys(T.athleten)[0];
   S=T.athleten[T.activeId]; save(); initAll(); renderTeam();
   if(document.getElementById("page-settings").classList.contains("visible")) renderSettings();
@@ -1056,6 +1188,133 @@ const esc = s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt
 const getPath=(o,p)=>p.split(".").reduce((a,k)=>a?.[k],o);
 const setPath=(o,p,v)=>{const k=p.split(".");const l=k.pop();k.reduce((a,x)=>a[x],o)[l]=v;};
 const clamp10=v=>{const n=+v;return n?Math.max(1,Math.min(10,n)):"";};
+
+/* =====================================================================
+   Cloud-Backend (Supabase) – aktiv, sobald URL und Key eingetragen sind.
+   Ohne Konfiguration läuft die App wie bisher rein lokal.
+   ===================================================================== */
+const BACKEND = {
+  url: "",       // z. B. "https://abcdefgh.supabase.co"
+  anonKey: "",   // "anon public" Key aus Project Settings → API
+};
+const CLOUD = () => !!(BACKEND.url && BACKEND.anonKey);
+let sb = null, cloudCtx = null, cloudPushT = null, lastPull = 0;
+
+function loadSupabase(){
+  return new Promise((res, rej)=>{
+    if(window.supabase) return res();
+    const sc = document.createElement("script");
+    sc.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+    sc.onload = res; sc.onerror = rej;
+    document.head.appendChild(sc);
+  });
+}
+async function cloudInit(){
+  await loadSupabase();
+  sb = window.supabase.createClient(BACKEND.url, BACKEND.anonKey);
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){ await cloudEnter(); }
+  else { T.session = null; updateLoginView(); }
+}
+async function cloudLogin(){
+  const err = t => { $("loginErr").textContent = t; };
+  const email = ($("loginEmail").value||"").trim().toLowerCase();
+  if(!email) return err("Bitte E-Mail-Adresse eingeben.");
+  if(loginMode === "athletsetup"){
+    const p1 = $("loginPwNeu").value, p2 = $("loginPwNeu2").value;
+    if(p1.length < 6) return err("Passwort: mindestens 6 Zeichen.");
+    if(p1 !== p2) return err("Die Passwörter stimmen nicht überein.");
+    const { data, error } = await sb.auth.signUp({ email, password: p1 });
+    if(error) return err(error.message);
+    if(data.session){ await cloudEnter(); return; }
+    loginMode = "login"; renderLoginMode();
+    return err("Bestätigungs-E-Mail gesendet – bitte Posteingang prüfen und danach anmelden.");
+  }
+  const { error } = await sb.auth.signInWithPassword({ email, password: $("loginPw").value||"" });
+  if(error){
+    $("registerBtn").hidden = false;
+    return err("Anmeldung fehlgeschlagen – falsches Passwort oder noch kein Konto.");
+  }
+  await cloudEnter();
+}
+async function cloudEnter(){
+  const err = t => { $("loginErr").textContent = t; };
+  const { data:{ user } } = await sb.auth.getUser();
+  const { data: mem } = await sb.from("members").select("role,athlete_key,team_id").eq("user_id", user.id).maybeSingle();
+  if(!mem){
+    err("Konto erstellt, aber noch keinem Team zugeordnet – dein Coach muss dich mit dieser E-Mail als Athlet:in anlegen.");
+    await sb.auth.signOut();
+    return;
+  }
+  cloudCtx = { role: mem.role, athleteKey: mem.athlete_key, teamId: mem.team_id, userId: user.id };
+  await cloudPull(true);
+  T.session = mem.role === "coach" ? { type: "coach" } : { type: "athlet", id: mem.athlete_key };
+  if(mem.role === "athlet" && !T.athleten[mem.athlete_key]){
+    err("Dein Datensatz wurde nicht gefunden – bitte beim Coach melden.");
+    await sb.auth.signOut(); T.session = null; return;
+  }
+  save(); enterApp();
+}
+async function cloudPull(initial){
+  lastPull = Date.now();
+  const { data: team } = await sb.from("teams").select("id,config").eq("id", cloudCtx.teamId).maybeSingle();
+  const { data: rows } = await sb.from("athletes").select("key,data").order("key");
+  if(rows && rows.length){
+    T.athleten = {};
+    rows.forEach(r => { T.athleten[r.key] = Object.assign(defaultAthlete(), r.data || {}); });
+    if(team && team.config) T.config = team.config;
+  } else if(initial && cloudCtx.role === "coach"){
+    // Erst-Migration: lokales Team in die Cloud hochladen
+    await cloudPushAll();
+  }
+  if(!T.athleten[T.activeId]) T.activeId = Object.keys(T.athleten)[0];
+  S = T.athleten[T.activeId] || (T.athleten.a1 = defaultAthlete());
+  syncPhasen(); ensurePhasenKeys(T);
+  initAll();
+}
+async function cloudPushAll(){
+  const rows = Object.entries(T.athleten).map(([key, A]) => ({
+    team_id: cloudCtx.teamId, key,
+    email: (A.profile.email||"").toLowerCase() || null,
+    data: A, updated_at: new Date().toISOString(),
+  }));
+  if(rows.length) await sb.from("athletes").upsert(rows, { onConflict: "team_id,key" });
+  await sb.from("teams").update({ config: T.config, updated_at: new Date().toISOString() }).eq("id", cloudCtx.teamId);
+}
+function cloudSchedulePush(){
+  if(!CLOUD() || !cloudCtx) return;
+  clearTimeout(cloudPushT);
+  cloudPushT = setTimeout(async ()=>{
+    const key = T.activeId, A = T.athleten[key];
+    if(!A) return;
+    await sb.from("athletes").upsert({
+      team_id: cloudCtx.teamId, key,
+      email: (A.profile.email||"").toLowerCase() || null,
+      data: A, updated_at: new Date().toISOString(),
+    }, { onConflict: "team_id,key" });
+    if(cloudCtx.role === "coach")
+      await sb.from("teams").update({ config: T.config, updated_at: new Date().toISOString() }).eq("id", cloudCtx.teamId);
+  }, 900);
+}
+async function cloudDeleteAthlet(key){
+  if(!CLOUD() || !cloudCtx) return;
+  await sb.from("athletes").delete().eq("team_id", cloudCtx.teamId).eq("key", key);
+}
+async function cloudUpsertAthlet(key){
+  if(!CLOUD() || !cloudCtx) return;
+  const A = T.athleten[key]; if(!A) return;
+  await sb.from("athletes").upsert({
+    team_id: cloudCtx.teamId, key,
+    email: (A.profile.email||"").toLowerCase() || null,
+    data: A, updated_at: new Date().toISOString(),
+  }, { onConflict: "team_id,key" });
+}
+// Beim Zurückkehren in die App frische Daten holen
+document.addEventListener("visibilitychange", ()=>{
+  if(!document.hidden && CLOUD() && cloudCtx && Date.now() - lastPull > 20000){
+    cloudPull(false);
+  }
+});
 
 /* ---------- Info-Animation ---------- */
 function openInfo(){ $("infoModal").hidden = false; }
@@ -1093,6 +1352,7 @@ function updateLoginView(){
 function coachSetupMode(){ loginMode="coachsetup"; renderLoginMode(); }
 function athletSetupMode(){ loginMode="athletsetup"; renderLoginMode(); }
 async function loginSubmit(){
+  if(CLOUD() && sb) return cloudLogin();
   const err = t => { $("loginErr").textContent = t; };
   const email = ($("loginEmail").value||"").trim().toLowerCase();
   if(!email) return err("Bitte E-Mail-Adresse eingeben.");
@@ -1151,6 +1411,7 @@ function applySessionView(){
   document.querySelector(".roles").style.display = alsAthlet ? "none" : "";
 }
 function logout(){
+  if(CLOUD() && sb){ sb.auth.signOut(); cloudCtx = null; }
   T.session = null; save();
   loginMode = "login"; updateLoginView();
 }
@@ -1590,6 +1851,7 @@ function createAthlet(){
   ["naVorname","naName","naTeam","naSaison","naEmail"].forEach(x=>$(x).value="");
   $("addForm").hidden=true;
   renderSettings(); renderTeam();
+  cloudUpsertAthlet(id);
   window.location.href = inviteMailto(A);   // Einladung im Mailprogramm öffnen
 }
 function renderSettings(){
@@ -1949,8 +2211,14 @@ initAll();
 growAll();
 applyRoleView();
 showPage(T.role==="coach" ? "team" : "form");
-applySessionView();
-updateLoginView();
+if(CLOUD()){
+  T.session = null;                 // Cloud entscheidet über die Anmeldung
+  applySessionView(); updateLoginView();
+  cloudInit().catch(()=>{ $("loginErr").textContent = "Cloud nicht erreichbar – bitte Internetverbindung prüfen."; });
+} else {
+  applySessionView();
+  updateLoginView();
+}
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   navigator.serviceWorker.register("./sw.js").catch(()=>{});
   // Wenn ein neuer Service Worker übernimmt: Seite einmal neu laden (neue Version aktivieren)
