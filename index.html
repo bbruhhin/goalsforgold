@@ -1280,8 +1280,10 @@ function enterApp(){
   applySessionView(); updateLoginView();
 }
 function applySessionView(){
-  const alsAthlet = T.session && T.session.type==="athlet";
-  document.querySelector(".roles").style.display = alsAthlet ? "none" : "";
+  // Rolle folgt dem Konto: Angemeldete sehen keinen A/C-Schalter mehr
+  document.querySelector(".roles").style.display = T.session ? "none" : "";
+  if(T.session && T.session.type==="coach" && T.role!=="coach") setRole("coach");
+  if(T.session && T.session.type==="athlet" && T.role!=="athlet") setRole("athlet");
 }
 function logout(){
   if(CLOUD() && sb){ sb.auth.signOut(); cloudCtx = null; }
