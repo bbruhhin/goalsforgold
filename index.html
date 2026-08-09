@@ -740,9 +740,7 @@
     </div>
     <div id="pieGrid" class="pie-grid"></div>
       <h3 class="stats-h">Profil im Vergleich</h3>
-    <p class="sub">SOLL-Zustand und aktueller Stand aus dem gewählten Check-in, Bewertung 1–10.</p>
-    <label class="f">Check-in</label>
-    <select id="radarCp" onchange="renderEval()"></select>
+    <p class="sub">SOLL-Zustand sowie IST-Profil von Athlet:in und Coach, Bewertung 1–10.</p>
     <div class="legend" id="radarLegend"></div>
     <div id="radarWrap"></div>
     </div>
@@ -766,16 +764,9 @@
     </div>
   </details>
 
-  <details class="sec-acc">
-    <summary><span class="sec-label">7 — Zielüberprüfung</span><h2>Check-ins während der Saison</h2></summary>
-    <div class="sec-body">
-    <p class="sub">Fünf Zeitpunkte. Athlet:in schätzt zuerst ein, dann der Coach. Bewertung 1–10 pro Bereich.</p>
-    <div id="cpArea"></div>
-  </div></details>
-
   <!-- 7 Flow -->
   <details class="sec-acc">
-    <summary><span class="sec-label">8 — Flow-Check</span><h2>Bin ich im Flow-Kanal?</h2></summary>
+    <summary><span class="sec-label">7 — Flow-Check</span><h2>Bin ich im Flow-Kanal?</h2></summary>
     <div class="sec-body">
     <p class="sub">Flow entsteht, wenn Herausforderung und Fähigkeiten im Gleichgewicht sind: zu viel Herausforderung führt zu Angst, zu wenig zu Langeweile. Vier Bedingungen: klare Ziele, Passung, unmittelbares Feedback, Fokus.</p>
     <div class="rate-row">
@@ -904,6 +895,7 @@ function defaultAthlete(){
     sollText:Object.fromEntries(CATS.map(c=>[c.id,""])),
     ist:Object.fromEntries(CATS.map(c=>[c.id,{staerken:[],entwicklung:[]}])),
     massnahmen:Object.fromEntries(INTERVALS.map(i=>[i.id,[]])),
+    istKommentar:{},
     checkpoints:Object.fromEntries(CHECKPOINTS.map(c=>[c.id,emptyCp()])),
     flow:{h:5,s:5},
     sprache:{schwung:""},
@@ -1141,7 +1133,7 @@ const TR = {
 "4 — Stats":["4 — Stats","4 — Stats"],
 "Stärken & Entwicklungsraum":["Forces & développement","Strengths & development"],
 "Profil im Vergleich":["Profil comparé","Profile comparison"],
-"SOLL-Zustand und aktueller Stand aus dem gewählten Check-in, Bewertung 1–10.":["État cible et état actuel du check-in sélectionné, évaluation 1–10.","Target state and current level from the selected check-in, rating 1–10."],
+"SOLL-Zustand sowie IST-Profil von Athlet:in und Coach, Bewertung 1–10.":["État cible et profil actuel de l'athlète et du coach, évaluation 1–10.","Target state plus current profile of athlete and coach, rating 1–10."],
 "Check-in":["Check-in","Check-in"],
 "SOLL":["CIBLE","TARGET"],
 "IST Athlet:in (Ø Stärken − Ø Entwicklung)":["ACTUEL athlète (Ø forces − Ø développement)","CURRENT athlete (Ø strengths − Ø development)"],
@@ -1175,7 +1167,7 @@ const TR = {
 "Fremdbild des Coaches: Fortschritt, Beobachtungen, Empfehlung.":["Regard du coach : progrès, observations, recommandation.","Coach's view: progress, observations, recommendation."],
 "Athleten-Felder sind für den Coach gesperrt.":["Les champs de l'athlète sont verrouillés pour le coach.","Athlete fields are locked for the coach."],
 "Coach-Felder füllt dein Coach aus – Rolle oben wechseln.":["Les champs coach sont remplis par ton coach.","Coach fields are filled in by your coach."],
-"8 — Flow-Check":["8 — Flow-Check","8 — Flow check"],
+"7 — Flow-Check":["7 — Flow-Check","7 — Flow check"],
 "Bin ich im Flow-Kanal?":["Suis-je dans le canal de flow ?","Am I in the flow channel?"],
 "Flow entsteht, wenn Herausforderung und Fähigkeiten im Gleichgewicht sind: zu viel Herausforderung führt zu Angst, zu wenig zu Langeweile. Vier Bedingungen: klare Ziele, Passung, unmittelbares Feedback, Fokus.":["Le flow naît quand le défi et les capacités sont en équilibre : trop de défi mène à l'anxiété, trop peu à l'ennui. Quatre conditions : objectifs clairs, adéquation, feedback immédiat, concentration.","Flow arises when challenge and skills are in balance: too much challenge leads to anxiety, too little to boredom. Four conditions: clear goals, fit, immediate feedback, focus."],
 "Wie erlebst du dein aktuelles Training / deine Rennen?":["Comment vis-tu ton entraînement / tes courses en ce moment ?","How do you experience your current training / races?"],
@@ -1261,6 +1253,10 @@ const TR = {
 "Datum":["Date","Date"],
 "Sprache":["Langue","Language"],
 "Zum Bearbeiten antippen":["Toucher pour modifier","Tap to edit"],
+"Kommentar Athlet:in":["Commentaire athlète","Athlete comment"],
+"Kommentar Coach":["Commentaire coach","Coach comment"],
+"Wie geht es dir mit deinem IST-Zustand in dieser Phase?":["Comment vis-tu ton état actuel dans cette phase ?","How do you feel about your current state in this phase?"],
+"Einschätzung des Coachs zu dieser Phase.":["Évaluation du coach pour cette phase.","Coach's assessment for this phase."],
 };
 /* Muster mit variablen Teilen */
 const TR_RX = [
@@ -1651,9 +1647,26 @@ function logChips(it, key){
 }
 function renderIst(){
   const curIv = INTERVALS[currentIntervalIdx()];
-  const fixBtn = `<div class="ist-fix">
-    <button class="add-btn" onclick="istFix()">Aktuelle Bewertungen für Phase «${esc(curIv.label)}» fixieren</button>
-  </div>`;
+  S.istKommentar = S.istKommentar || {};
+  const kom = S.istKommentar[curIv.id] = S.istKommentar[curIv.id] || {a:"", c:""};
+  const fruehere = INTERVALS
+    .filter(iv=>iv.id!==curIv.id && S.istKommentar[iv.id] && (S.istKommentar[iv.id].a || S.istKommentar[iv.id].c))
+    .map(iv=>{
+      const k=S.istKommentar[iv.id];
+      return `<div class="ist-log" style="margin:4px 0 0">
+        <span>${esc(iv.label)}: ${esc(k.a||"")}${k.c?` · Coach: ${esc(k.c)}`:""}</span></div>`;
+    }).join("");
+  const fixBtn = `
+    <label class="f">Kommentar Athlet:in</label>
+    <textarea class="af" placeholder="Wie geht es dir mit deinem IST-Zustand in dieser Phase?"
+      oninput="istKomEdit('${curIv.id}','a',this.value)">${esc(kom.a||"")}</textarea>
+    <label class="f">Kommentar Coach</label>
+    <textarea class="cf" placeholder="Einschätzung des Coachs zu dieser Phase."
+      oninput="istKomEdit('${curIv.id}','c',this.value)">${esc(kom.c||"")}</textarea>
+    ${fruehere}
+    <div class="ist-fix">
+      <button class="add-btn" onclick="istFix()">Aktuelle Bewertungen für Phase «${esc(curIv.label)}» fixieren</button>
+    </div>`;
   $("istArea").innerHTML = CATS.map(c=>{
     const d=S.ist[c.id];
     const sum=l=>l.reduce((a,x)=>a+(+x.wert||0),0);
@@ -1686,6 +1699,12 @@ function renderIst(){
     </div>`;
   }).join("") + fixBtn;
   applyLocks();
+}
+function istKomEdit(ivId, wer, val){
+  S.istKommentar = S.istKommentar || {};
+  S.istKommentar[ivId] = S.istKommentar[ivId] || {a:"", c:""};
+  S.istKommentar[ivId][wer] = val;
+  save();
 }
 function istAdd(cat,key){
   const list=S.ist[cat][key];
@@ -1767,49 +1786,6 @@ function renderMass(){
 }
 
 /* ---------- Checkpoints ---------- */
-function renderCps(openId){
-  $("cpArea").innerHTML = CHECKPOINTS.map((c,i)=>{
-    const cp=S.checkpoints[c.id];
-    const coach=T.role==="coach";
-    const ampelBtns=(who,locked)=>AMPEL.map(a=>`
-      <button class="${cp[who].ampel===a.id?a.cls:""}" ${locked?"disabled":""}
-        onclick="setAmpel('${c.id}','${who}','${a.id}')"><i></i>${a.label}</button>`).join("");
-    const rateRow=(who,locked)=>CATS.map(cat=>`
-      <td><input type="number" min="1" max="10" value="${esc(cp[who].rating[cat.id])}" ${locked?"disabled":""}
-        oninput="S.checkpoints['${c.id}'].${who}.rating['${cat.id}']=clamp10(this.value);save()"></td>`).join("");
-    const statDots = `<span class="dot ${cp.athlet.ampel||""}" title="Athlet:in"></span><span class="dot ${cp.coach.ampel||""}" title="Coach"></span>`;
-    return `
-    <details class="cp" ${openId===c.id?"open":""} data-cp="${c.id}">
-      <summary><span class="num">${i+1}</span>${esc(c.label)}${c.date?`<small class="cp-date">${fmtDate(c.date)}</small>`:""}<span class="stat">${statDots}</span></summary>
-      <div class="cp-body">
-        <div class="who a">Athlet:in</div>
-        <div class="ampel">${ampelBtns("athlet",coach)}</div>
-        <table class="cmp">
-          <tr><th></th>${CATS.map(cat=>`<th>${esc(cat.kurz)}</th>`).join("")}</tr>
-          <tr><td class="rowlbl"><i style="background:var(--athlet)"></i>Stand</td>${rateRow("athlet",coach)}</tr>
-        </table>
-        <label class="f">Kommentar</label>
-        <textarea class="af" oninput="S.checkpoints['${c.id}'].athlet.kommentar=this.value;save()">${esc(cp.athlet.kommentar)}</textarea>
-
-        <div class="who c">Coach</div>
-        <div class="ampel">${ampelBtns("coach",!coach)}</div>
-        <table class="cmp">
-          <tr><th></th>${CATS.map(cat=>`<th>${esc(cat.kurz)}</th>`).join("")}</tr>
-          <tr><td class="rowlbl"><i style="background:var(--coach)"></i>Stand</td>${rateRow("coach",!coach)}</tr>
-        </table>
-        <label class="f">Kommentar</label>
-        <textarea class="cf" oninput="S.checkpoints['${c.id}'].coach.kommentar=this.value;save()">${esc(cp.coach.kommentar)}</textarea>
-        <div class="rollehinweis">${coach?"Athleten-Felder sind für den Coach gesperrt.":"Coach-Felder füllt dein Coach aus – Rolle oben wechseln."}</div>
-      </div>
-    </details>`;
-  }).join("");
-  applyLocks();
-}
-function setAmpel(cpId,who,id){
-  const cp=S.checkpoints[cpId];
-  cp[who].ampel = cp[who].ampel===id?null:id;
-  save(); renderCps(cpId);
-}
 
 /* ---------- Flow ---------- */
 function onFlow(){
@@ -1935,8 +1911,7 @@ function renderPhasen(){
 }
 function afterPhasenChange(){
   save(); syncPhasen(); ensurePhasenKeys(T);
-  renderPhasen(); renderMass(); renderCps();
-  $("radarCp").dataset.init="";
+  renderPhasen(); renderMass(); renderIst();
 }
 function addPhase(){
   const c = T.config;
@@ -1956,8 +1931,7 @@ function phasenEdit(typ,i,field,val){
   if(typ==="cp") T.config.checkpoints[i][field]=val;
   else T.config.intervals[i].label=val;
   save(); syncPhasen();
-  renderMass(); renderCps();
-  $("radarCp").dataset.init="";
+  renderMass(); renderIst();
 }
 function appUrl(){
   return location.protocol.startsWith("http")
@@ -2109,11 +2083,10 @@ function renderTeam(){
   $("teamList").innerHTML = ids.map(id=>{
     const A = T.athleten[id];
     const all = Object.values(A.massnahmen).flat();
-    const cpDots = CHECKPOINTS.map(c=>{
-      const cp = A.checkpoints[c.id];
-      const amp = cp.athlet.ampel || cp.coach.ampel;
-      return `<span class="dot ${amp||""}" title="${esc(c.label)}"></span>`;
-    }).join("");
+    const phaseFixed = iv => CATS.some(cc=>["staerken","entwicklung"].some(k=>
+      ((A.ist[cc.id]||{})[k]||[]).some(it=>it.log && it.log[iv.id])));
+    const cpDots = INTERVALS.map(iv=>
+      `<span class="dot ${phaseFixed(iv)?"good":""}" title="${esc(iv.label)}"></span>`).join("");
     const mStatus = {erledigt:"good", laeuft:"warn", offen:""};
     const mDots = all.map(m=>
       `<span class="dot ${mStatus[m.status]||""}" title="${esc(m.text)}"></span>`).join("")
@@ -2126,17 +2099,18 @@ function renderTeam(){
         mList.push(`<div class="xp-row"><span class="dot ${mStatus[m.status]||""}"></span>
           <span>${esc(m.text)||"<i>ohne Titel</i>"}</span><small>${esc(iv.label)}</small></div>`);
       }));
-      const cpList = CHECKPOINTS.map(c=>{
-        const cp=A.checkpoints[c.id];
-        return `<div class="xp-row"><span class="dot ${cp.athlet.ampel||""}"></span><span class="wer">A</span>
-          <span class="dot ${cp.coach.ampel||""}"></span><span class="wer">C</span>
-          <span style="margin-left:6px">${esc(c.label)}</span><small>${fmtDate(c.date)}</small></div>`;
+      const cpList = INTERVALS.map((iv,i)=>{
+        const kom=(A.istKommentar||{})[iv.id]||{};
+        const komTxt=kom.a||kom.c||"";
+        return `<div class="xp-row"><span class="dot ${phaseFixed(iv)?"good":""}"></span>
+          <span>${esc(iv.label)}</span>
+          <small>${komTxt?esc(komTxt.slice(0,60)):fmtDate((CHECKPOINTS[i+1]||{}).date)}</small></div>`;
       }).join("");
       expand = `<div class="tc-expand">
         <div class="xp-goal">${A.ziel.haupt?esc(A.ziel.haupt):"<i>Noch kein Ziel definiert</i>"}</div>
         <div class="xp-h">Massnahmen</div>
         ${mList.join("")||`<div class="xp-row tc-none">keine</div>`}
-        <div class="xp-h">Check-ins (Athlet:in / Coach)</div>
+        <div class="xp-h">Check-ins</div>
         ${cpList}
       </div>`;
     }
@@ -2239,19 +2213,6 @@ function currentIntervalIdx(){
 function renderEval(){
   $("pieWho").textContent = `${athletName(S)} – Verhältnis der Summen aus dem IST-Zustand, ein Kreis pro Bereich (wie in der Vorlage).`;
   renderPies();
-  // Checkpoint-Auswahl füllen (Auswahl erhalten)
-  const sel=$("radarCp");
-  const hasData=id=>{
-    const cp=S.checkpoints[id];
-    return CATS.some(c=>cp.athlet.rating[c.id]!=="" || cp.coach.rating[c.id]!=="");
-  };
-  if(!sel.dataset.init){
-    let def="start";
-    CHECKPOINTS.forEach(c=>{ if(hasData(c.id)) def=c.id; });
-    sel.innerHTML = CHECKPOINTS.map(c=>`<option value="${c.id}">${esc(c.label)}</option>`).join("");
-    sel.value=def; sel.dataset.init="1";
-  }
-  const cp=S.checkpoints[sel.value];
   // IST-Profil: pro Kategorie Mittelwert der Stärken minus Mittelwert des Entwicklungsraums
   const istProfil={}, istProfilC={};
   let istHatDaten=false, istHatCoach=false;
@@ -2270,18 +2231,11 @@ function renderEval(){
   if(istHatCoach) series.push({vals:istProfilC,color:"var(--coach)",nodots:true,
     fill:"color-mix(in srgb,var(--coach) 22%,transparent)",name:"IST Coach"});
   series.push({vals:S.soll,color:"var(--muted)",dash:true,name:"SOLL"});
-  const aAny=CATS.some(c=>cp.athlet.rating[c.id]!=="");
-  const cAny=CATS.some(c=>cp.coach.rating[c.id]!=="");
-  if(aAny) series.push({vals:cp.athlet.rating,color:"var(--athlet)",fill:"color-mix(in srgb,var(--athlet) 14%,transparent)",name:"Athlet:in"});
-  if(cAny) series.push({vals:cp.coach.rating,color:"var(--coach)",fill:"color-mix(in srgb,var(--coach) 12%,transparent)",name:"Coach"});
   $("radarLegend").innerHTML =
     (istHatDaten?`<span><i style="background:color-mix(in srgb,var(--gold) 45%,transparent);border:1.5px solid var(--gold)"></i>IST Athlet:in (Ø Stärken − Ø Entwicklung)</span>`:"") +
     (istHatCoach?`<span><i style="background:color-mix(in srgb,var(--coach) 35%,transparent);border:1.5px solid var(--coach)"></i>IST Coach</span>`:"") +
-    `<span><i class="line"></i>SOLL</span>` +
-    (aAny?`<span><i style="background:var(--athlet)"></i>Athlet:in</span>`:"") +
-    (cAny?`<span><i style="background:var(--coach)"></i>Coach</span>`:"");
-  $("radarWrap").innerHTML = radarSvg(series) +
-    (!aAny&&!cAny?`<p class="pie-empty" style="text-align:center">Für diesen Check-in gibt es noch keine Bewertungen – gezeigt wird nur der SOLL-Zustand.</p>`:"");
+    `<span><i class="line"></i>SOLL</span>`;
+  $("radarWrap").innerHTML = radarSvg(series);
 }
 
 /* ---------- Export / Import / Demo ---------- */
@@ -2411,10 +2365,8 @@ function initAll(){
   $("roleA").classList.toggle("active",T.role==="athlet");
   $("roleC").classList.toggle("active",T.role==="coach");
   renderSoll(); renderIst(); renderMass();
-  renderCps(document.querySelector(".cp[open]")?.dataset.cp);
   renderFlow(); applyLocks();
   updateTitle();
-  $("radarCp").dataset.init="";
   if(typeof growAll==="function") growAll();
   if(document.getElementById("page-form").classList.contains("visible")) renderEval();
   if(document.getElementById("page-team").classList.contains("visible")) renderTeam();
