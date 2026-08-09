@@ -1657,6 +1657,12 @@ applySessionView();
 updateLoginView();
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  // Wenn ein neuer Service Worker übernimmt: Seite einmal neu laden (neue Version aktivieren)
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+    if(reloaded) return; reloaded = true;
+    location.reload();
+  });
 }
 </script>
 </body>

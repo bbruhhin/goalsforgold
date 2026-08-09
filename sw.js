@@ -1,5 +1,5 @@
-// GoalsFORGold – einfacher Offline-Cache
-const CACHE = "goalsforgold-v1";
+// GoalsFORGold – Offline-Cache, Netzwerk zuerst (immer frisch, wenn online)
+const CACHE = "goalsforgold-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -22,17 +22,20 @@ self.addEventListener("activate", e => {
   );
 });
 
-// Netzwerk zuerst (damit Updates ankommen), Cache als Offline-Fallback
+// Netzwerk zuerst und dabei den HTTP-Cache umgehen (cache:"no-cache" = beim Server
+// revalidieren), damit neue Versionen sofort ankommen. Cache nur als Offline-Fallback.
 self.addEventListener("fetch", e => {
-  if (e.request.method !== "GET") return;
+  if (e.request.method !== "GET" || !e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request.url, { cache: "no-cache" })
       .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request.url, copy));
+        }
         return res;
       })
-      .catch(() => caches.match(e.request, { ignoreSearch: true })
+      .catch(() => caches.match(e.request.url, { ignoreSearch: true })
         .then(hit => hit || caches.match("./index.html")))
   );
 });
