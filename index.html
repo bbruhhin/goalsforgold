@@ -195,6 +195,16 @@
     padding:8px 10px;border-radius:6px;cursor:pointer;
   }
   .menu-drop button:hover{background:var(--field)}
+  .menu-lang{display:flex;gap:4px;border-top:1px solid var(--hairline);margin-top:4px;padding-top:6px}
+  .menu-lang button{flex:1;text-align:center;font-size:11px;font-weight:800;padding:6px 4px}
+  .menu-lang button.lang-on{background:var(--gold-soft);color:var(--gold-dark)}
+  .lang-row{display:flex;gap:8px;justify-content:center;margin-top:16px}
+  .lang-row button{
+    border:1px solid #333;background:transparent;color:#b9b8b2;
+    font:inherit;font-size:11px;font-weight:800;border-radius:7px;
+    padding:5px 12px;cursor:pointer;letter-spacing:.05em;
+  }
+  .lang-row button.lang-on{border-color:var(--gold);color:var(--gold)}
   /* ---------- Tabs ---------- */
   .tabs{
     position:sticky;top:0;z-index:25;
@@ -634,6 +644,7 @@
     <button class="login-alt" id="coachSetupBtn" onclick="coachSetupMode()" hidden>Coach-Konto einrichten</button>
     <button class="login-alt" id="registerBtn" onclick="athletSetupMode()" hidden>Neu hier? Mit dieser E-Mail als Athlet:in registrieren</button>
     <div class="login-hint">Athlet:innen melden sich mit der E-Mail-Adresse aus der Einladung an und setzen beim ersten Mal ihr eigenes Passwort.</div>
+    <div class="lang-row" id="loginLangRow"></div>
   </div>
 </div>
 <header>
@@ -655,6 +666,7 @@
         <div id="menuDrop" class="menu-drop" hidden>
           <button id="menuSettingsBtn" onclick="openSettings()">Team Settings</button>
           <button onclick="logout()">Abmelden</button>
+          <div class="menu-lang" id="menuLangRow"></div>
         </div>
       </div>
     </div>
@@ -1046,7 +1058,7 @@ function setActive(id){
   T.activeId=id; S=T.athleten[id]; save(); initAll();
 }
 function delAthlet(id){
-  if(Object.keys(T.athleten).length<=1){ alert("Die letzte Athletin kann nicht gelöscht werden."); return; }
+  if(Object.keys(T.athleten).length<=1){ alert(tr("Die letzte Athletin kann nicht gelöscht werden.")); return; }
   if(!confirm(`${athletName(T.athleten[id])} wirklich entfernen? Die Daten gehen verloren (vorher exportieren!).`)) return;
   delete T.athleten[id];
   cloudDeleteAthlet(id);
@@ -1061,6 +1073,236 @@ const esc = s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt
 const getPath=(o,p)=>p.split(".").reduce((a,k)=>a?.[k],o);
 const setPath=(o,p,v)=>{const k=p.split(".");const l=k.pop();k.reduce((a,x)=>a[x],o)[l]=v;};
 const clamp10=v=>{const n=+v;return n?Math.max(1,Math.min(10,n)):"";};
+
+
+/* =====================================================================
+   Mehrsprachigkeit: Deutsch (Quelle), Français, English
+   Übersetzt alle Textknoten/Platzhalter, auch nach dynamischem Rendern.
+   ===================================================================== */
+let LANG = localStorage.getItem("g4g-lang") || "de";
+document.documentElement.lang = LANG;
+function setLang(l){ localStorage.setItem("g4g-lang", l); location.reload(); }
+/* [fr, en] */
+const TR = {
+"Übersicht":["Aperçu","Overview"],
+"Goals":["Goals","Goals"],
+"Stats":["Stats","Stats"],
+"Athlet:in":["Athlète","Athlete"],
+"Coach":["Coach","Coach"],
+"Wechseln":["Changer","Switch"],
+"Alles aufklappen":["Tout déplier","Expand all"],
+"Alles zuklappen":["Tout replier","Collapse all"],
+"Team Settings":["Réglages équipe","Team settings"],
+"Settings":["Réglages","Settings"],
+"Abmelden":["Se déconnecter","Log out"],
+"Menü":["Menu","Menu"],
+"So funktioniert GoalsFORGold":["Comment fonctionne GoalsFORGold","How GoalsFORGold works"],
+"Anmelden":["Se connecter","Sign in"],
+"E-Mail":["E-mail","Email"],
+"Passwort":["Mot de passe","Password"],
+"name@beispiel.ch":["nom@exemple.ch","name@example.com"],
+"Neues Passwort (min. 6 Zeichen)":["Nouveau mot de passe (min. 6 caractères)","New password (min. 6 characters)"],
+"Passwort wiederholen":["Répéter le mot de passe","Repeat password"],
+"Coach-Konto einrichten":["Créer un compte coach","Set up coach account"],
+"Coach-Konto erstellen":["Créer le compte coach","Create coach account"],
+"Neu hier? Mit dieser E-Mail als Athlet:in registrieren":["Nouveau ici ? S'inscrire comme athlète avec cet e-mail","New here? Register as an athlete with this email"],
+"Als Athlet:in registrieren":["S'inscrire comme athlète","Register as athlete"],
+"Registrieren & anmelden":["S'inscrire et se connecter","Register & sign in"],
+"Passwort setzen & anmelden":["Définir le mot de passe et se connecter","Set password & sign in"],
+"Willkommen! Setze dein Passwort":["Bienvenue ! Définis ton mot de passe","Welcome! Set your password"],
+"Athlet:innen melden sich mit der E-Mail-Adresse aus der Einladung an und setzen beim ersten Mal ihr eigenes Passwort.":["Les athlètes se connectent avec l'adresse e-mail de l'invitation et définissent leur mot de passe lors de la première connexion.","Athletes sign in with the email address from their invitation and set their own password on first login."],
+"Bitte E-Mail-Adresse eingeben.":["Veuillez saisir une adresse e-mail.","Please enter an email address."],
+"Passwort: mindestens 6 Zeichen.":["Mot de passe : au moins 6 caractères.","Password: at least 6 characters."],
+"Die Passwörter stimmen nicht überein.":["Les mots de passe ne correspondent pas.","The passwords do not match."],
+"Anmeldung fehlgeschlagen – falsches Passwort oder noch kein Konto.":["Échec de la connexion – mot de passe incorrect ou pas encore de compte.","Sign-in failed – wrong password or no account yet."],
+"Diese E-Mail ist auf diesem Gerät nicht registriert.":["Cet e-mail n'est pas enregistré sur cet appareil.","This email is not registered on this device."],
+"Falsches Passwort.":["Mot de passe incorrect.","Wrong password."],
+"Konto erstellt, aber noch keinem Team zugeordnet – dein Coach muss dich mit dieser E-Mail als Athlet:in anlegen.":["Compte créé, mais pas encore rattaché à une équipe – ton coach doit d'abord t'ajouter comme athlète avec cet e-mail.","Account created, but not yet assigned to a team – your coach must first add you as an athlete with this email."],
+"Bestätigungs-E-Mail gesendet – bitte Posteingang prüfen und danach anmelden.":["E-mail de confirmation envoyé – vérifie ta boîte de réception puis connecte-toi.","Confirmation email sent – please check your inbox, then sign in."],
+"Cloud nicht erreichbar – bitte Internetverbindung prüfen.":["Cloud inaccessible – vérifie ta connexion Internet.","Cloud unreachable – please check your internet connection."],
+"Dein Datensatz wurde nicht gefunden – bitte beim Coach melden.":["Tes données n'ont pas été trouvées – contacte ton coach.","Your record was not found – please contact your coach."],
+"1 — Ziel":["1 — Objectif","1 — Goal"],
+"Mein Saisonziel":["Mon objectif de saison","My season goal"],
+"Formuliert von der Athletin / dem Athleten. Spezifisch, messbar, terminiert.":["Formulé par l'athlète. Spécifique, mesurable, daté.","Written by the athlete. Specific, measurable, time-bound."],
+"z. B. Durchbruch schaffen im Europacup, Skitechnik verbessern":["p. ex. percer en Coupe d'Europe, améliorer la technique de ski","e.g. break through in the Europa Cup, improve ski technique"],
+"Was spüre / fühle ich, um das Ziel zu erreichen?":["Qu'est-ce que je ressens pour atteindre cet objectif ?","What do I feel on the way to this goal?"],
+"Einschätzung Coach":["Évaluation du coach","Coach's assessment"],
+"Ist das Ziel passend gewählt? Herausforderung und Fähigkeiten im Gleichgewicht?":["L'objectif est-il bien choisi ? Défi et capacités en équilibre ?","Is the goal well chosen? Challenge and skills in balance?"],
+"2 — SOLL-Zustand":["2 — État CIBLE","2 — TARGET state"],
+"Wo will ich hin?":["Où est-ce que je veux aller ?","Where do I want to go?"],
+"Bewertung 1–10 pro Bereich, am Ende der Saison.":["Évaluation 1–10 par domaine, en fin de saison.","Rating 1–10 per area, at the end of the season."],
+"3 — IST-Zustand":["3 — État ACTUEL","3 — CURRENT state"],
+"Wo stehe ich heute?":["Où en suis-je aujourd'hui ?","Where am I today?"],
+"Stärken (Bewertung 1–10) und Entwicklungsraum (Bewertung 10–1), max. 4 pro Bereich.":["Forces (évaluation 1–10) et axes de développement (évaluation 10–1), max. 4 par domaine.","Strengths (rating 1–10) and development areas (rating 10–1), max. 4 per area."],
+"Stärken":["Forces","Strengths"],
+"Entwicklungsraum":["Développement","Development"],
+"+ Punkt":["+ Point","+ Item"],
+"Entfernen":["Supprimer","Remove"],
+"Keine Bewertungen zum Fixieren vorhanden":["Aucune évaluation à figer","No ratings available to lock"],
+"4 — Stats":["4 — Stats","4 — Stats"],
+"Stärken & Entwicklungsraum":["Forces & développement","Strengths & development"],
+"Profil im Vergleich":["Profil comparé","Profile comparison"],
+"SOLL-Zustand und aktueller Stand aus dem gewählten Check-in, Bewertung 1–10.":["État cible et état actuel du check-in sélectionné, évaluation 1–10.","Target state and current level from the selected check-in, rating 1–10."],
+"Check-in":["Check-in","Check-in"],
+"SOLL":["CIBLE","TARGET"],
+"IST (Ø Stärken − Ø Entwicklung)":["ACTUEL (Ø forces − Ø développement)","CURRENT (Ø strengths − Ø development)"],
+"Für diesen Check-in gibt es noch keine Bewertungen – gezeigt wird nur der SOLL-Zustand.":["Pas encore d'évaluations pour ce check-in – seul l'état cible est affiché.","No ratings for this check-in yet – only the target state is shown."],
+"Noch keine Bewertungen":["Pas encore d'évaluations","No ratings yet"],
+"5 — Massnahmen":["5 — Mesures","5 — Actions"],
+"Was zahle ich aufs Ziel ein?":["Qu'est-ce que j'investis pour mon objectif ?","What am I doing for my goal?"],
+"Maximal 3 Massnahmen pro Saisonabschnitt.":["Maximum 3 mesures par phase de saison.","Maximum 3 actions per season phase."],
+"Maximum erreicht – 3 Massnahmen. Fokus schlägt Menge.":["Maximum atteint – 3 mesures. La priorité prime sur la quantité.","Maximum reached – 3 actions. Focus beats quantity."],
+"Bereich …":["Domaine …","Area …"],
+"Offen":["Ouvert","Open"],
+"In Arbeit":["En cours","In progress"],
+"Erledigt":["Fait","Done"],
+"keine":["aucune","none"],
+"ohne Titel":["sans titre","untitled"],
+"6 — Gemeinsame Sprache":["6 — Langage commun","6 — Shared language"],
+"Verstehen wir dasselbe?":["Parlons-nous de la même chose ?","Do we mean the same thing?"],
+"Athlet:in und Coach sollen mit denselben Worten über Technik sprechen.":["Athlète et coach doivent parler de la technique avec les mêmes mots.","Athlete and coach should talk about technique using the same words."],
+"Erkläre in deinen Worten einen GS / SL Schwung":["Explique avec tes mots un virage de GS / SL","Explain a GS / SL turn in your own words"],
+"Vom Kurvenansatz über die Druckphase bis zum Umkanten – so wie du es deinem Coach erklären würdest.":["De l'entrée de courbe à la bascule des carres, en passant par la phase de pression – comme tu l'expliquerais à ton coach.","From turn initiation through the pressure phase to edge change – the way you would explain it to your coach."],
+"7 — Zielüberprüfung":["7 — Revue des objectifs","7 — Goal review"],
+"Check-ins während der Saison":["Check-ins pendant la saison","Check-ins during the season"],
+"Fünf Zeitpunkte. Athlet:in schätzt zuerst ein, dann der Coach. Bewertung 1–10 pro Bereich.":["L'athlète s'évalue d'abord, puis le coach. Évaluation 1–10 par domaine.","The athlete rates first, then the coach. Rating 1–10 per area."],
+"Auf Kurs":["Sur la bonne voie","On track"],
+"Teilweise":["Partiellement","Partly"],
+"Anpassen":["À ajuster","Adjust"],
+"Stand":["Niveau","Level"],
+"Kommentar":["Commentaire","Comment"],
+"Was läuft gut? Wo hakt es? Was brauchst du?":["Qu'est-ce qui va bien ? Où ça coince ? De quoi as-tu besoin ?","What's going well? Where is it difficult? What do you need?"],
+"Fremdbild des Coaches: Fortschritt, Beobachtungen, Empfehlung.":["Regard du coach : progrès, observations, recommandation.","Coach's view: progress, observations, recommendation."],
+"Athleten-Felder sind für den Coach gesperrt.":["Les champs de l'athlète sont verrouillés pour le coach.","Athlete fields are locked for the coach."],
+"Coach-Felder füllt dein Coach aus – Rolle oben wechseln.":["Les champs coach sont remplis par ton coach.","Coach fields are filled in by your coach."],
+"8 — Flow-Check":["8 — Flow-Check","8 — Flow check"],
+"Bin ich im Flow-Kanal?":["Suis-je dans le canal de flow ?","Am I in the flow channel?"],
+"Flow entsteht, wenn Herausforderung und Fähigkeiten im Gleichgewicht sind: zu viel Herausforderung führt zu Angst, zu wenig zu Langeweile. Vier Bedingungen: klare Ziele, Passung, unmittelbares Feedback, Fokus.":["Le flow naît quand le défi et les capacités sont en équilibre : trop de défi mène à l'anxiété, trop peu à l'ennui. Quatre conditions : objectifs clairs, adéquation, feedback immédiat, concentration.","Flow arises when challenge and skills are in balance: too much challenge leads to anxiety, too little to boredom. Four conditions: clear goals, fit, immediate feedback, focus."],
+"Wie erlebst du dein aktuelles Training / deine Rennen?":["Comment vis-tu ton entraînement / tes courses en ce moment ?","How do you experience your current training / races?"],
+"Herausforderung":["Défi","Challenge"],
+"Fähigkeiten":["Capacités","Skills"],
+"Eigene Fähigkeiten →":["Capacités propres →","Own skills →"],
+"Anforderungen →":["Exigences →","Demands →"],
+"niedrig":["faible","low"],
+"hoch":["élevé","high"],
+"Bore-out":["Bore-out","Bore-out"],
+"Unterforderung":["Sous-sollicitation","Underchallenged"],
+"Sicherheit":["Sécurité","Comfort"],
+"Überforderung":["Surmenage","Overchallenged"],
+"Burn-out":["Burn-out","Burn-out"],
+"In Anlehnung an Mihály Csíkszentmihályi & Norbert Bischof":["D'après Mihály Csíkszentmihályi & Norbert Bischof","Based on Mihály Csíkszentmihályi & Norbert Bischof"],
+"Bore-out – stark unterfordert":["Bore-out – fortement sous-sollicité","Bore-out – strongly underchallenged"],
+"Deine Fähigkeiten liegen weit über der Anforderung. So geht Motivation verloren – setz dir deutlich ambitioniertere Ziele.":["Tes capacités dépassent largement les exigences. La motivation s'érode – fixe-toi des objectifs nettement plus ambitieux.","Your skills far exceed the demands. Motivation fades this way – set clearly more ambitious goals."],
+"Da ist mehr drin: Erhöhe die Aufgabenschwierigkeit oder such dir ein forderndes Zwischenziel.":["Tu peux faire plus : augmente la difficulté ou choisis un objectif intermédiaire exigeant.","There is more in you: raise the difficulty or pick a demanding interim goal."],
+"Sicherheit – Komfortzone":["Sécurité – zone de confort","Comfort zone"],
+"Solide Basis, aber wenig Entwicklung. Ein Schritt mehr Herausforderung bringt dich Richtung Flow.":["Base solide, mais peu de progression. Un cran de défi en plus te rapproche du flow.","Solid base, but little development. One step more challenge moves you toward flow."],
+"FLOW – optimale Passung":["FLOW – adéquation optimale","FLOW – optimal fit"],
+"Anforderung und Fähigkeiten sind im Gleichgewicht. Genau hier entstehen Bestleistungen – halte diese Balance.":["Exigences et capacités sont en équilibre. C'est ici que naissent les meilleures performances – garde cet équilibre.","Demands and skills are in balance. This is where peak performance happens – keep this balance."],
+"Herausforderung – Wachstumszone":["Défi – zone de progression","Challenge – growth zone"],
+"Leicht über dem aktuellen Können – ideal zum Lernen, solange Erholung und Erfolgserlebnisse nicht zu kurz kommen.":["Légèrement au-dessus du niveau actuel – idéal pour apprendre, tant que récupération et réussites restent présentes.","Slightly above your current level – ideal for learning, as long as recovery and small wins are not neglected."],
+"Die Anforderung übersteigt die Fähigkeiten deutlich. Brich das Ziel in Zwischenziele herunter und baue gezielt Fähigkeiten auf.":["Les exigences dépassent nettement les capacités. Découpe l'objectif en étapes et développe tes capacités de manière ciblée.","The demands clearly exceed the skills. Break the goal into interim steps and build skills deliberately."],
+"Burn-out-Gefahr":["Risque de burn-out","Burn-out risk"],
+"Dauerhaft massiv überfordert – Stress und Angst dominieren. Anforderungen reduzieren und mit dem Coach neu planen.":["Surcharge massive et durable – stress et anxiété dominent. Réduis les exigences et replanifie avec ton coach.","Persistently far overchallenged – stress and anxiety dominate. Reduce demands and replan with your coach."],
+"Mein Team":["Mon équipe","My team"],
+"Massnahmen":["Mesures","Actions"],
+"Check-ins":["Check-ins","Check-ins"],
+"Noch kein Ziel definiert":["Pas encore d'objectif défini","No goal defined yet"],
+"Check-ins (Athlet:in / Coach)":["Check-ins (athlète / coach)","Check-ins (athlete / coach)"],
+"Profil":["Profil","Profile"],
+"Profilbild wählen":["Choisir une photo","Choose photo"],
+"Bild entfernen":["Supprimer la photo","Remove photo"],
+"Name":["Nom","Last name"],
+"Vorname":["Prénom","First name"],
+"Team":["Équipe","Team"],
+"Saison":["Saison","Season"],
+"Zeitpunkte & Phasen":["Échéances & phases","Checkpoints & phases"],
+"Gilt für die ganze App und alle Athlet:innen: Check-in-Zeitpunkte (Text + Datum) und die Phasen dazwischen. Anzahl unten einstellbar.":["Valable pour toute l'app et toutes les athlètes : échéances de check-in (texte + date) et phases intermédiaires. Nombre réglable ci-dessous.","Applies to the whole app and all athletes: check-in dates (text + date) and the phases in between. Number adjustable below."],
+"Phase":["Phase","Phase"],
+"Anzahl Phasen":["Nombre de phases","Number of phases"],
+"Team verwalten":["Gérer l'équipe","Manage team"],
+"+ Athlet:in hinzufügen":["+ Ajouter une athlète","+ Add athlete"],
+"E-Mail-Adresse":["Adresse e-mail","Email address"],
+"athletin@beispiel.ch":["athlete@exemple.ch","athlete@example.com"],
+"Erstellen & Einladung senden":["Créer et envoyer l'invitation","Create & send invitation"],
+"Abbrechen":["Annuler","Cancel"],
+"Die Einladung öffnet sich als vorbereitete E-Mail in deinem Mailprogramm. Die Athletin setzt ihr Passwort beim ersten Login in der App.":["L'invitation s'ouvre comme e-mail pré-rempli dans ton logiciel de messagerie. L'athlète définit son mot de passe lors de sa première connexion.","The invitation opens as a pre-filled email in your mail app. The athlete sets her password on first login."],
+"Aktiv":["Actif","Active"],
+"Einladung senden":["Envoyer l'invitation","Send invitation"],
+"Keine E-Mail":["Pas d'e-mail","No email"],
+"Die letzte Athletin kann nicht gelöscht werden.":["Impossible de supprimer la dernière athlète.","The last athlete cannot be deleted."],
+"Bitte Vor- und Nachname eingeben.":["Veuillez saisir le prénom et le nom.","Please enter first and last name."],
+"Bitte gültige E-Mail-Adresse eingeben.":["Veuillez saisir une adresse e-mail valide.","Please enter a valid email address."],
+"1 · Ziele gemeinsam festlegen":["1 · Définir les objectifs ensemble","1 · Set goals together"],
+"Athlet:in und Coach erfassen die Saisonziele im Handy":["Athlète et coach saisissent les objectifs de saison sur le téléphone","Athlete and coach enter the season goals on the phone"],
+"2 · Check-in am Termin":["2 · Check-in à l'échéance","2 · Check-in on schedule"],
+"Selbstbild und Fremdbild – die Ampel zeigt den Stand":["Auto-évaluation et regard du coach – le feu indique l'état","Self-view and coach's view – the traffic light shows the status"],
+"3 · Massnahmen anpassen":["3 · Ajuster les mesures","3 · Adjust the actions"],
+"Max. 3 Massnahmen pro Phase zahlen aufs Ziel ein":["Max. 3 mesures par phase contribuent à l'objectif","Max. 3 actions per phase contribute to the goal"],
+"Ziel erreicht – GOLD!":["Objectif atteint – OR !","Goal achieved – GOLD!"],
+"GoalsFORGold – der Weg durch die Saison":["GoalsFORGold – le chemin à travers la saison","GoalsFORGold – the journey through the season"],
+"Ziele setzen → an den Check-in-Terminen gemeinsam überprüfen → Massnahmen anpassen → Gold holen.":["Définir les objectifs → les revoir ensemble aux check-ins → ajuster les mesures → décrocher l'or.","Set goals → review together at the check-ins → adjust actions → win gold."],
+"Saisonstart":["Début de saison","Season start"],
+"Ende Vorbereitung":["Fin de préparation","End of preparation"],
+"Mitte Saison":["Mi-saison","Mid-season"],
+"Ende Saison":["Fin de saison","End of season"],
+"Vorbereitung":["Préparation","Preparation"],
+"Erste Saisonhälfte":["Première moitié de saison","First half of season"],
+"Zweite Saisonhälfte":["Deuxième moitié de saison","Second half of season"],
+"1. Saisonhälfte":["1re moitié de saison","1st half of season"],
+"2. Saisonhälfte":["2e moitié de saison","2nd half of season"],
+"Skitechnik / Taktik":["Technique de ski / tactique","Ski technique / tactics"],
+"Physis":["Physique","Physical"],
+"Persönlichkeit / Psyche":["Personnalité / mental","Personality / mind"],
+"Material":["Matériel","Equipment"],
+"Technik":["Technique","Technique"],
+"Psyche":["Mental","Mind"],
+"Total":["Total","Total"],
+"GoalsFORGold · Zielvereinbarung für Athlet:innen und Coaches · basiert auf dem Zielvereinbarungsblatt und dem Flow-Prinzip (Csíkszentmihályi)":["GoalsFORGold · Convention d'objectifs pour athlètes et coachs · basée sur la feuille d'objectifs et le principe du flow (Csíkszentmihályi)","GoalsFORGold · Goal agreement for athletes and coaches · based on the goal-setting sheet and the flow principle (Csíkszentmihályi)"],
+"Datum":["Date","Date"],
+"Sprache":["Langue","Language"],
+};
+/* Muster mit variablen Teilen */
+const TR_RX = [
+[/^Summe (\d+)$/, "Somme $1", "Sum $1"],
+[/^\+ Massnahme \((\d)\/3\)$/, "+ Mesure ($1/3)", "+ Action ($1/3)"],
+[/^Massnahme (\d+) – konkret und überprüfbar$/, "Mesure $1 – concrète et vérifiable", "Action $1 – concrete and verifiable"],
+[/^Aktuelle Bewertungen für Phase «(.+)» fixieren$/, "Figer les évaluations actuelles pour la phase « $1 »", "Lock current ratings for phase “$1”"],
+[/^✓ (\d+) Bewertungen für «(.+)» fixiert$/, "✓ $1 évaluations figées pour « $2 »", "✓ $1 ratings locked for “$2”"],
+[/^Was genau heisst das für (.+)\? In eigenen Worten …$/, "Concrètement, ça veut dire quoi pour $1 ? Avec tes mots …", "What exactly does this mean for $1? In your own words …"],
+[/^(.+) – Verhältnis der Summen aus dem IST-Zustand, ein Kreis pro Bereich \(wie in der Vorlage\)\.$/, "$1 – rapport des sommes de l'état actuel, un cercle par domaine.", "$1 – ratio of the current-state sums, one circle per area."],
+[/^Stärken (\d+) · Entwicklung (\d+)$/, "Forces $1 · Développement $2", "Strengths $1 · Development $2"],
+];
+function tr(str){
+  if(LANG === "de" || !str) return str;
+  const idx = LANG === "fr" ? 0 : 1;
+  const hit = TR[str.trim()];
+  if(hit) return str.replace(str.trim(), hit[idx]);
+  for(const [re, fr, en] of TR_RX){
+    if(re.test(str.trim())) return str.replace(re, LANG === "fr" ? fr : en);
+  }
+  return str;
+}
+function translateDom(root){
+  if(LANG === "de") return;
+  const r = root && root.nodeType === 1 ? root : document.body;
+  if(root && root.nodeType === 3){ root.nodeValue = tr(root.nodeValue); return; }
+  const w = document.createTreeWalker(r, NodeFilter.SHOW_TEXT);
+  let n; while(n = w.nextNode()){ if(n.nodeValue.trim()) n.nodeValue = tr(n.nodeValue); }
+  r.querySelectorAll("[placeholder]").forEach(el=>{ el.placeholder = tr(el.placeholder); });
+  r.querySelectorAll("[title]").forEach(el=>{ el.title = tr(el.title); });
+  if(r.placeholder) r.placeholder = tr(r.placeholder);
+}
+let trBusy = false;
+new MutationObserver(muts=>{
+  if(trBusy || LANG === "de") return;
+  trBusy = true;
+  muts.forEach(m=>m.addedNodes.forEach(n=>translateDom(n)));
+  trBusy = false;
+}).observe(document.documentElement, {childList:true, subtree:true});
+function langButtons(cls){
+  return ["de","fr","en"].map(l=>
+    `<button class="${cls} ${LANG===l?"lang-on":""}" onclick="setLang('${l}')">${l.toUpperCase()}</button>`).join("");
+}
 
 /* =====================================================================
    Cloud-Backend (Supabase) – aktiv, sobald URL und Key eingetragen sind.
@@ -1717,8 +1959,8 @@ function createAthlet(){
   const vor=$("naVorname").value.trim(), nam=$("naName").value.trim(),
         team=$("naTeam").value.trim(), sais=$("naSaison").value.trim(),
         mail=$("naEmail").value.trim().toLowerCase();
-  if(!vor || !nam) { alert("Bitte Vor- und Nachname eingeben."); return; }
-  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { alert("Bitte gültige E-Mail-Adresse eingeben."); return; }
+  if(!vor || !nam) { alert(tr("Bitte Vor- und Nachname eingeben.")); return; }
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { alert(tr("Bitte gültige E-Mail-Adresse eingeben.")); return; }
   let n=1; while(T.athleten["a"+n]) n++;
   const id="a"+n, A=defaultAthlete();
   A.profile={name:nam,vorname:vor,team:team,saison:sais,email:mail};
@@ -2094,6 +2336,9 @@ if(CLOUD()){
   applySessionView();
   updateLoginView();
 }
+$("loginLangRow").innerHTML = langButtons("");
+$("menuLangRow").innerHTML = langButtons("");
+if(LANG !== "de") translateDom(document.body);
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   navigator.serviceWorker.register("./sw.js").catch(()=>{});
   // Wenn ein neuer Service Worker übernimmt: Seite einmal neu laden (neue Version aktivieren)
