@@ -898,6 +898,64 @@ function defaultAthlete(){
     sprache:{schwung:""},
   };
 }
+const SEED_ATHLETES = [
+  {
+    profile:{name:"Flatscher",vorname:"Anna",team:"Elite EC3 Frauen",saison:"2026/27",email:""},
+    ziel:{
+      haupt:"Top 15 EC SL/GS Resultate an EC Rennen / Top 7 Junioren-WM SL oder GS / Top 3 FIS-Punkteliste Jahrgang",
+      gefuehl:"Aggressivität spüren / Druck spüren / ich fühle mich geladen",
+      coachKommentar:"",
+    },
+    sollText:{
+      technik:"Direkte Linie / passendes Timing",
+      physis:"Muskeltonus ist erhöht / spritzig fühlen",
+      psyche:"Handlungsorientiertes Denken, Fokus auf die Aufgabe / Aggressivität spüren",
+      material:"Neutrales Setup",
+    },
+    ist:{
+      technik:{
+        staerken:[
+          {text:"Instinkt für Linie",wert:9},
+          {text:"Gefühlvolles Fahren",wert:7},
+          {text:"Beschleunigung über den Innenski am Schwungende",wert:6},
+          {text:"Kurzer Schwung",wert:7}],
+        entwicklung:[
+          {text:"Timing",wert:5},
+          {text:"Körperspannung",wert:5},
+          {text:"Innenski anfangs Kurve",wert:5},
+          {text:"Körperschwerpunkt zu tief",wert:4}],
+      },
+      physis:{
+        staerken:[
+          {text:"Maximalkraft Beine",wert:8},
+          {text:"Explosivität",wert:7},
+          {text:"Gleichgewicht",wert:7},
+          {text:"Schnellkraft",wert:7}],
+        entwicklung:[
+          {text:"Ausdauer",wert:4},
+          {text:"Oberkörper",wert:5},
+          {text:"Rumpf",wert:6},
+          {text:"Hamstring",wert:5}],
+      },
+      psyche:{
+        staerken:[
+          {text:"Killerinstinkt",wert:9},
+          {text:"Liebt Druck / Wettkampftyp",wert:10},
+          {text:"Visualisieren",wert:8},
+          {text:"Fokus am Start",wert:8}],
+        entwicklung:[
+          {text:"Ungeduldig",wert:4},
+          {text:"Hart mit sich selber",wert:3},
+          {text:"1.-Lauf-Verhalten",wert:6},
+          {text:"Zu hohe Erwartungen",wert:4}],
+      },
+      material:{
+        staerken:[{text:"Skischuhe",wert:""}],
+        entwicklung:[],
+      },
+    },
+  },
+];
 const DEFAULT_COACHES = [
   {email:"bjoern.bruhin@swiss-ski.ch",  pw:"ee018357fd27fd6637cb77f5f255aa1d3c4dc3893dee2f18717cd1a9437703b3"},
   {email:"silvano.stadler@swiss-ski.ch", pw:"e8752b15e359a5f21db199b61ca4bc332602e6bc841d783943f850eb0ea55f5b"},
@@ -933,6 +991,15 @@ function normalizeTeam(t){
     if(!t.coaches.some(c=>(c.email||"").toLowerCase()===dc.email)) t.coaches.push({...dc});
   });
   delete t.coach;
+  SEED_ATHLETES.forEach(sa=>{
+    const schonDa = Object.values(t.athleten).some(A=>
+      (A.profile.vorname||"").trim().toLowerCase()===sa.profile.vorname.toLowerCase() &&
+      (A.profile.name||"").trim().toLowerCase()===sa.profile.name.toLowerCase());
+    if(!schonDa){
+      let n=1; while(t.athleten["a"+n]) n++;
+      t.athleten["a"+n] = Object.assign(defaultAthlete(), JSON.parse(JSON.stringify(sa)));
+    }
+  });
   if(t.session === undefined) t.session = null;
   ensurePhasenKeys(t);
   return t;
