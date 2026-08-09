@@ -1177,13 +1177,13 @@ const TR = {
 "Anforderungen →":["Exigences →","Demands →"],
 "niedrig":["faible","low"],
 "hoch":["élevé","high"],
-"Bore-out":["Bore-out","Bore-out"],
+"Stillstand":["Stagnation","Stagnation"],
 "Unterforderung":["Sous-sollicitation","Underchallenged"],
 "Sicherheit":["Sécurité","Comfort"],
 "Überforderung":["Surmenage","Overchallenged"],
-"Burn-out":["Burn-out","Burn-out"],
+"Danger Zone":["Danger Zone","Danger Zone"],
 "In Anlehnung an Mihály Csíkszentmihályi & Norbert Bischof":["D'après Mihály Csíkszentmihályi & Norbert Bischof","Based on Mihály Csíkszentmihályi & Norbert Bischof"],
-"Bore-out – stark unterfordert":["Bore-out – fortement sous-sollicité","Bore-out – strongly underchallenged"],
+"Stillstand – stark unterfordert":["Stagnation – fortement sous-sollicité","Stagnation – strongly underchallenged"],
 "Deine Fähigkeiten liegen weit über der Anforderung. So geht Motivation verloren – setz dir deutlich ambitioniertere Ziele.":["Tes capacités dépassent largement les exigences. La motivation s'érode – fixe-toi des objectifs nettement plus ambitieux.","Your skills far exceed the demands. Motivation fades this way – set clearly more ambitious goals."],
 "Da ist mehr drin: Erhöhe die Aufgabenschwierigkeit oder such dir ein forderndes Zwischenziel.":["Tu peux faire plus : augmente la difficulté ou choisis un objectif intermédiaire exigeant.","There is more in you: raise the difficulty or pick a demanding interim goal."],
 "Sicherheit – Komfortzone":["Sécurité – zone de confort","Comfort zone"],
@@ -1193,7 +1193,7 @@ const TR = {
 "Herausforderung – Wachstumszone":["Défi – zone de progression","Challenge – growth zone"],
 "Leicht über dem aktuellen Können – ideal zum Lernen, solange Erholung und Erfolgserlebnisse nicht zu kurz kommen.":["Légèrement au-dessus du niveau actuel – idéal pour apprendre, tant que récupération et réussites restent présentes.","Slightly above your current level – ideal for learning, as long as recovery and small wins are not neglected."],
 "Die Anforderung übersteigt die Fähigkeiten deutlich. Brich das Ziel in Zwischenziele herunter und baue gezielt Fähigkeiten auf.":["Les exigences dépassent nettement les capacités. Découpe l'objectif en étapes et développe tes capacités de manière ciblée.","The demands clearly exceed the skills. Break the goal into interim steps and build skills deliberately."],
-"Burn-out-Gefahr":["Risque de burn-out","Burn-out risk"],
+"Danger Zone – massiv überfordert":["Danger Zone – fortement surchargé","Danger Zone – massively overchallenged"],
 "Dauerhaft massiv überfordert – Stress und Angst dominieren. Anforderungen reduzieren und mit dem Coach neu planen.":["Surcharge massive et durable – stress et anxiété dominent. Réduis les exigences et replanifie avec ton coach.","Persistently far overchallenged – stress and anxiety dominate. Reduce demands and replan with your coach."],
 "Mein Team":["Mon équipe","My team"],
 "Massnahmen":["Mesures","Actions"],
@@ -1797,13 +1797,13 @@ function renderFlow(){
   $("flowHOut").textContent=S.flow.h; $("flowSOut").textContent=S.flow.s;
   const Ox=46,Oy=252,W=258,H=234;
   const ZONES=[
-    {a1:0, a2:13, f:"#a83a38", l:"Bore-out",       cls:"angst", txt:"<b>Bore-out – stark unterfordert</b>Deine Fähigkeiten liegen weit über der Anforderung. So geht Motivation verloren – setz dir deutlich ambitioniertere Ziele."},
+    {a1:0, a2:13, f:"#a83a38", l:"Stillstand",       cls:"angst", txt:"<b>Stillstand – stark unterfordert</b>Deine Fähigkeiten liegen weit über der Anforderung. So geht Motivation verloren – setz dir deutlich ambitioniertere Ziele."},
     {a1:13,a2:26, f:"#c07636", l:"Unterforderung", cls:"lw",    txt:"<b>Unterforderung</b>Da ist mehr drin: Erhöhe die Aufgabenschwierigkeit oder such dir ein forderndes Zwischenziel."},
     {a1:26,a2:38, f:"#8f9d45", l:"Sicherheit",     cls:"",      txt:"<b>Sicherheit – Komfortzone</b>Solide Basis, aber wenig Entwicklung. Ein Schritt mehr Herausforderung bringt dich Richtung Flow."},
     {a1:38,a2:52, f:"#4e9257", l:"FLOW", big:true, cls:"flow",  txt:"<b>FLOW – optimale Passung</b>Anforderung und Fähigkeiten sind im Gleichgewicht. Genau hier entstehen Bestleistungen – halte diese Balance."},
     {a1:52,a2:64, f:"#8f9d45", l:"Herausforderung",cls:"",      txt:"<b>Herausforderung – Wachstumszone</b>Leicht über dem aktuellen Können – ideal zum Lernen, solange Erholung und Erfolgserlebnisse nicht zu kurz kommen."},
     {a1:64,a2:77, f:"#c07636", l:"Überforderung",  cls:"lw",    txt:"<b>Überforderung</b>Die Anforderung übersteigt die Fähigkeiten deutlich. Brich das Ziel in Zwischenziele herunter und baue gezielt Fähigkeiten auf."},
-    {a1:77,a2:90, f:"#a83a38", l:"Burn-out",       cls:"angst", txt:"<b>Burn-out-Gefahr</b>Dauerhaft massiv überfordert – Stress und Angst dominieren. Anforderungen reduzieren und mit dem Coach neu planen."},
+    {a1:77,a2:90, f:"#a83a38", l:"Danger Zone",       cls:"angst", txt:"<b>Danger Zone – massiv überfordert</b>Dauerhaft massiv überfordert – Stress und Angst dominieren. Anforderungen reduzieren und mit dem Coach neu planen."},
   ];
   const rad=a=>a*Math.PI/180;
   const corner=Math.atan2(H,W)*180/Math.PI;
