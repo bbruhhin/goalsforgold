@@ -376,7 +376,8 @@
   .ist-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:7px}
   @media(max-width:520px){.ist-cols{grid-template-columns:1fr}}
   .ist-col .col-h{font-size:11px;font-weight:700;color:var(--ink-2);margin-bottom:4px}
-  .ist-row{display:grid;grid-template-columns:1fr 40px 22px;gap:5px;margin-bottom:5px;align-items:center}
+  .ist-row{display:grid;grid-template-columns:1fr 40px 40px 20px;gap:4px;margin-bottom:5px;align-items:center}
+  .ist-row .wert-c{box-shadow:inset 0 0 0 1.5px var(--coach)}
   .ist-del{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;padding:0}
   .ist-add{
     border:1px dashed var(--hairline);background:transparent;color:var(--muted);
@@ -718,7 +719,7 @@
   <details class="sec-acc">
     <summary><span class="sec-label">3 — IST-Zustand</span><h2>Wo stehe ich heute?</h2></summary>
     <div class="sec-body">
-    <p class="sub">Stärken (Bewertung 1–10) und Entwicklungsraum (Bewertung 10–1), max. 4 pro Bereich.</p>
+    <p class="sub">Stärken (Bewertung 1–10) und Entwicklungsraum (Bewertung 10–1), max. 4 pro Bereich. Spalte A = Athlet:in, Spalte C = Coach.</p>
     <div id="istArea"></div>
   </div></details>
 
@@ -1124,7 +1125,7 @@ const TR = {
 "Bewertung 1–10 pro Bereich, am Ende der Saison.":["Évaluation 1–10 par domaine, en fin de saison.","Rating 1–10 per area, at the end of the season."],
 "3 — IST-Zustand":["3 — État ACTUEL","3 — CURRENT state"],
 "Wo stehe ich heute?":["Où en suis-je aujourd'hui ?","Where am I today?"],
-"Stärken (Bewertung 1–10) und Entwicklungsraum (Bewertung 10–1), max. 4 pro Bereich.":["Forces (évaluation 1–10) et axes de développement (évaluation 10–1), max. 4 par domaine.","Strengths (rating 1–10) and development areas (rating 10–1), max. 4 per area."],
+"Stärken (Bewertung 1–10) und Entwicklungsraum (Bewertung 10–1), max. 4 pro Bereich. Spalte A = Athlet:in, Spalte C = Coach.":["Forces (évaluation 1–10) et axes de développement (évaluation 10–1), max. 4 par domaine. Colonne A = athlète, colonne C = coach.","Strengths (rating 1–10) and development areas (rating 10–1), max. 4 per area. Column A = athlete, column C = coach."],
 "Stärken":["Forces","Strengths"],
 "Entwicklungsraum":["Développement","Development"],
 "+ Punkt":["+ Point","+ Item"],
@@ -1136,7 +1137,8 @@ const TR = {
 "SOLL-Zustand und aktueller Stand aus dem gewählten Check-in, Bewertung 1–10.":["État cible et état actuel du check-in sélectionné, évaluation 1–10.","Target state and current level from the selected check-in, rating 1–10."],
 "Check-in":["Check-in","Check-in"],
 "SOLL":["CIBLE","TARGET"],
-"IST (Ø Stärken − Ø Entwicklung)":["ACTUEL (Ø forces − Ø développement)","CURRENT (Ø strengths − Ø development)"],
+"IST Athlet:in (Ø Stärken − Ø Entwicklung)":["ACTUEL athlète (Ø forces − Ø développement)","CURRENT athlete (Ø strengths − Ø development)"],
+"IST Coach":["ACTUEL coach","CURRENT coach"],
 "Für diesen Check-in gibt es noch keine Bewertungen – gezeigt wird nur der SOLL-Zustand.":["Pas encore d'évaluations pour ce check-in – seul l'état cible est affiché.","No ratings for this check-in yet – only the target state is shown."],
 "Noch keine Bewertungen":["Pas encore d'évaluations","No ratings yet"],
 "5 — Massnahmen":["5 — Mesures","5 — Actions"],
@@ -1629,8 +1631,15 @@ function wertStyle(v,key){
 }
 function logChips(it, key){
   if(!it.log) return "";
-  const chips = INTERVALS.filter(iv=>it.log[iv.id]).map(iv=>
-    `<span>${esc(iv.label)} <b style="${wertStyle(it.log[iv.id], key)}">${it.log[iv.id]}</b></span>`).join("");
+  const chips = INTERVALS.filter(iv=>it.log[iv.id]).map(iv=>{
+    const v = it.log[iv.id];
+    const a = (typeof v === "object") ? v.a : v;
+    const c = (typeof v === "object") ? v.c : null;
+    let teil = "";
+    if(a) teil += `A <b style="${wertStyle(a, key)}">${a}</b>`;
+    if(c) teil += ` C <b style="${wertStyle(c, key)};box-shadow:inset 0 0 0 1.5px var(--coach)">${c}</b>`;
+    return `<span>${esc(iv.label)} ${teil}</span>`;
+  }).join("");
   return chips ? `<div class="ist-log">${chips}</div>` : "";
 }
 function renderIst(){
@@ -1649,8 +1658,10 @@ function renderIst(){
         rows+=`<div class="ist-row">
           <input type="text" class="af" placeholder="${i+1}." value="${esc(it.text)}"
             oninput="istEdit('${c.id}','${key}',${i},'text',this.value)">
-          <input type="number" class="af" min="1" max="10" value="${esc(it.wert)}" style="${wertStyle(it.wert,key)}"
+          <input type="number" class="af" min="1" max="10" title="Athlet:in" placeholder="A" value="${esc(it.wert)}" style="${wertStyle(it.wert,key)}"
             oninput="istEdit('${c.id}','${key}',${i},'wert',this.value);this.style.cssText=wertStyle(this.value,'${key}')">
+          <input type="number" class="cf wert-c" min="1" max="10" title="Coach" placeholder="C" value="${esc(it.wertC||"")}" style="${wertStyle(it.wertC,key)}"
+            oninput="istEdit('${c.id}','${key}',${i},'wertC',this.value);this.style.cssText=wertStyle(this.value,'${key}')">
           <button class="ist-del af" title="Entfernen" onclick="istDel('${c.id}','${key}',${i})">✕</button>
         </div>${logChips(it, key)}`;
       }
@@ -1685,7 +1696,11 @@ function istFix(){
   let n=0;
   CATS.forEach(c=>["staerken","entwicklung"].forEach(key=>{
     S.ist[c.id][key].forEach(it=>{
-      if(+it.wert){ it.log = it.log||{}; it.log[iv.id] = +it.wert; n++; }
+      if(+it.wert || +it.wertC){
+        it.log = it.log||{};
+        it.log[iv.id] = { a: +it.wert||null, c: +it.wertC||null };
+        n++;
+      }
     });
   }));
   save(); renderIst();
@@ -1700,7 +1715,7 @@ function istFix(){
 function istEdit(cat,key,idx,field,val){
   const list=S.ist[cat][key];
   while(list.length<=idx) list.push({text:"",wert:""});
-  list[idx][field] = field==="wert" ? clamp10(val) : val;
+  list[idx][field] = (field==="wert"||field==="wertC") ? clamp10(val) : val;
   save();
   const el=document.querySelector(`[data-sum="${cat}-${key}"]`);
   el.textContent = "Summe " + list.reduce((a,x)=>a+(+x.wert||0),0);
@@ -2231,24 +2246,30 @@ function renderEval(){
   }
   const cp=S.checkpoints[sel.value];
   // IST-Profil: pro Kategorie Mittelwert der Stärken minus Mittelwert des Entwicklungsraums
-  const istProfil={};
-  let istHatDaten=false;
+  const istProfil={}, istProfilC={};
+  let istHatDaten=false, istHatCoach=false;
   CATS.forEach(c=>{
-    const avg=l=>{const v=l.map(x=>+x.wert).filter(Boolean); return v.length? v.reduce((a,b)=>a+b,0)/v.length : 0;};
-    const st=avg(S.ist[c.id].staerken), en=avg(S.ist[c.id].entwicklung);
+    const avg=(l,f)=>{const v=l.map(x=>+x[f]).filter(Boolean); return v.length? v.reduce((a,b)=>a+b,0)/v.length : 0;};
+    const st=avg(S.ist[c.id].staerken,"wert"), en=avg(S.ist[c.id].entwicklung,"wert");
+    const stC=avg(S.ist[c.id].staerken,"wertC"), enC=avg(S.ist[c.id].entwicklung,"wertC");
     if(st||en) istHatDaten=true;
+    if(stC||enC) istHatCoach=true;
     istProfil[c.id]=Math.max(0, Math.min(10, st-en));
+    istProfilC[c.id]=Math.max(0, Math.min(10, stC-enC));
   });
   const series=[];
   if(istHatDaten) series.push({vals:istProfil,color:"var(--gold)",nodots:true,
     fill:"color-mix(in srgb,var(--gold) 32%,transparent)",name:"IST"});
+  if(istHatCoach) series.push({vals:istProfilC,color:"var(--coach)",nodots:true,
+    fill:"color-mix(in srgb,var(--coach) 22%,transparent)",name:"IST Coach"});
   series.push({vals:S.soll,color:"var(--muted)",dash:true,name:"SOLL"});
   const aAny=CATS.some(c=>cp.athlet.rating[c.id]!=="");
   const cAny=CATS.some(c=>cp.coach.rating[c.id]!=="");
   if(aAny) series.push({vals:cp.athlet.rating,color:"var(--athlet)",fill:"color-mix(in srgb,var(--athlet) 14%,transparent)",name:"Athlet:in"});
   if(cAny) series.push({vals:cp.coach.rating,color:"var(--coach)",fill:"color-mix(in srgb,var(--coach) 12%,transparent)",name:"Coach"});
   $("radarLegend").innerHTML =
-    (istHatDaten?`<span><i style="background:color-mix(in srgb,var(--gold) 45%,transparent);border:1.5px solid var(--gold)"></i>IST (Ø Stärken − Ø Entwicklung)</span>`:"") +
+    (istHatDaten?`<span><i style="background:color-mix(in srgb,var(--gold) 45%,transparent);border:1.5px solid var(--gold)"></i>IST Athlet:in (Ø Stärken − Ø Entwicklung)</span>`:"") +
+    (istHatCoach?`<span><i style="background:color-mix(in srgb,var(--coach) 35%,transparent);border:1.5px solid var(--coach)"></i>IST Coach</span>`:"") +
     `<span><i class="line"></i>SOLL</span>` +
     (aAny?`<span><i style="background:var(--athlet)"></i>Athlet:in</span>`:"") +
     (cAny?`<span><i style="background:var(--coach)"></i>Coach</span>`:"");
