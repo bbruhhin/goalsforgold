@@ -716,9 +716,13 @@ function defaultAthlete(){
     sprache:{schwung:""},
   };
 }
+const DEFAULT_COACHES = [
+  {email:"bjoern.bruhin@swiss-ski.ch",  pw:"ee018357fd27fd6637cb77f5f255aa1d3c4dc3893dee2f18717cd1a9437703b3"},
+  {email:"silvano.stadler@swiss-ski.ch", pw:"e8752b15e359a5f21db199b61ca4bc332602e6bc841d783943f850eb0ea55f5b"},
+];
 function defaultState(){
   return { role:"athlet", activeId:"a1", config:defaultConfig(),
-    coach:{email:"",pw:null}, session:null,
+    coaches:DEFAULT_COACHES.map(c=>({...c})), session:null,
     athleten:{a1:defaultAthlete()} };
 }
 function normalizeTeam(t){
@@ -740,7 +744,13 @@ function normalizeTeam(t){
     id: (oldIv[i] && oldIv[i].id) || IV_IDS[i] || ("iv_m"+i),
     label: (oldIv[i] && oldIv[i].label) || IV_DEFAULTS[i] || ("Phase "+(i+1)),
   }));
-  t.coach = t.coach || {email:"",pw:null};
+  if(!Array.isArray(t.coaches)){
+    t.coaches = (t.coach && t.coach.email) ? [{email:t.coach.email, pw:t.coach.pw||null}] : [];
+  }
+  DEFAULT_COACHES.forEach(dc=>{
+    if(!t.coaches.some(c=>(c.email||"").toLowerCase()===dc.email)) t.coaches.push({...dc});
+  });
+  delete t.coach;
   if(t.session === undefined) t.session = null;
   ensurePhasenKeys(t);
   return t;
@@ -813,7 +823,7 @@ function updateLoginView(){
   $("loginPage").hidden = !gesperrt;
   document.body.classList.toggle("locked", gesperrt);
   if(gesperrt){
-    $("coachSetupBtn").hidden = !!T.coach.email;
+    $("coachSetupBtn").hidden = T.coaches.length > 0;
     $("loginErr").textContent = "";
     renderLoginMode();
   }
@@ -827,13 +837,14 @@ async function loginSubmit(){
     const p1=$("loginPwNeu").value, p2=$("loginPwNeu2").value;
     if(p1.length<6) return err("Passwort: mindestens 6 Zeichen.");
     if(p1!==p2) return err("Die Passwörter stimmen nicht überein.");
-    T.coach.email = email; T.coach.pw = await hashPw(p1);
+    T.coaches.push({email:email, pw:await hashPw(p1)});
     T.session = {type:"coach"}; save(); enterApp(); return;
   }
-  const isCoach = T.coach.email && email === T.coach.email.toLowerCase();
+  const coachHit = T.coaches.find(c=>(c.email||"").toLowerCase()===email);
+  const isCoach = !!coachHit;
   const hit = Object.entries(T.athleten).find(([id,A])=>(A.profile.email||"").toLowerCase()===email);
   if(!isCoach && !hit) return err("Diese E-Mail ist nicht registriert. Frag deinen Coach nach einer Einladung.");
-  const konto = isCoach ? T.coach : hit[1];
+  const konto = isCoach ? coachHit : hit[1];
   if(!konto.pw){
     if(loginMode!=="set"){ loginMode="set"; renderLoginMode(); return err(""); }
     const p1=$("loginPwNeu").value, p2=$("loginPwNeu2").value;
@@ -1597,7 +1608,6 @@ function loadDemo(){
   });
   T.activeId="a1"; S=T.athleten.a1;
   T.config = defaultConfig();
-  T.coach = {email:"coach@goalsforgold.ch", pw:T.coach && T.coach.pw ? T.coach.pw : null};
   Object.values(T.athleten).forEach(A=>{
     A.profile.email = (A.profile.vorname+"."+A.profile.name+"@demo.ch").toLowerCase();
   });
