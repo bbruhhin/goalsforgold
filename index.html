@@ -1706,7 +1706,7 @@ function radarSvg(series){
       CATS.map((c,i)=>{
         const v=+s.vals[c.id]||0;
         const [x,y]=pt(i,v).split(",");
-        return s.dash?"":`<circle cx="${x}" cy="${y}" r="3.5" fill="${s.color}" stroke="var(--surface)" stroke-width="1.5"/>`;
+        return (s.dash||s.nodots)?"":`<circle cx="${x}" cy="${y}" r="3.5" fill="${s.color}" stroke="var(--surface)" stroke-width="1.5"/>`;
       }).join("");
   }).join("");
   return `<svg viewBox="0 0 340 310" role="img" aria-label="Profilvergleich">
@@ -1739,12 +1739,25 @@ function renderEval(){
     sel.value=def; sel.dataset.init="1";
   }
   const cp=S.checkpoints[sel.value];
-  const series=[{vals:S.soll,color:"var(--muted)",dash:true,name:"SOLL"}];
+  // IST-Profil: pro Kategorie Mittelwert der Stärken minus Mittelwert des Entwicklungsraums
+  const istProfil={};
+  let istHatDaten=false;
+  CATS.forEach(c=>{
+    const avg=l=>{const v=l.map(x=>+x.wert).filter(Boolean); return v.length? v.reduce((a,b)=>a+b,0)/v.length : 0;};
+    const st=avg(S.ist[c.id].staerken), en=avg(S.ist[c.id].entwicklung);
+    if(st||en) istHatDaten=true;
+    istProfil[c.id]=Math.max(0, Math.min(10, st-en));
+  });
+  const series=[];
+  if(istHatDaten) series.push({vals:istProfil,color:"var(--gold)",nodots:true,
+    fill:"color-mix(in srgb,var(--gold) 32%,transparent)",name:"IST"});
+  series.push({vals:S.soll,color:"var(--muted)",dash:true,name:"SOLL"});
   const aAny=CATS.some(c=>cp.athlet.rating[c.id]!=="");
   const cAny=CATS.some(c=>cp.coach.rating[c.id]!=="");
   if(aAny) series.push({vals:cp.athlet.rating,color:"var(--athlet)",fill:"color-mix(in srgb,var(--athlet) 14%,transparent)",name:"Athlet:in"});
   if(cAny) series.push({vals:cp.coach.rating,color:"var(--coach)",fill:"color-mix(in srgb,var(--coach) 12%,transparent)",name:"Coach"});
   $("radarLegend").innerHTML =
+    (istHatDaten?`<span><i style="background:color-mix(in srgb,var(--gold) 45%,transparent);border:1.5px solid var(--gold)"></i>IST (Ø Stärken − Ø Entwicklung)</span>`:"") +
     `<span><i class="line"></i>SOLL</span>` +
     (aAny?`<span><i style="background:var(--athlet)"></i>Athlet:in</span>`:"") +
     (cAny?`<span><i style="background:var(--coach)"></i>Coach</span>`:"");
