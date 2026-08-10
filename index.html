@@ -1199,7 +1199,9 @@ function normalizeTeam(t){
     if(!t.coaches.some(c=>(c.email||"").toLowerCase()===dc.email)) t.coaches.push({...dc});
   });
   delete t.coach;
+  const seedGeloescht = (t.config && t.config.seedGeloescht) || [];
   SEED_ATHLETES.forEach(sa=>{
+    if(seedGeloescht.includes(sa.profile.vorname + " " + sa.profile.name)) return;
     const vorhanden = Object.values(t.athleten).find(A=>
       (A.profile.vorname||"").trim().toLowerCase()===sa.profile.vorname.toLowerCase() &&
       (A.profile.name||"").trim().toLowerCase()===sa.profile.name.toLowerCase());
@@ -1254,6 +1256,15 @@ function setActive(id){
 function delAthlet(id){
   if(Object.keys(T.athleten).length<=1){ alert(tr("Die letzte Athletin kann nicht gelöscht werden.")); return; }
   if(!confirm(`${athletName(T.athleten[id])} wirklich entfernen? Die Daten gehen verloren (vorher exportieren!).`)) return;
+  const gel = T.athleten[id];
+  const seedHit = SEED_ATHLETES.find(sa=>
+    sa.profile.vorname.toLowerCase()===(gel.profile.vorname||"").trim().toLowerCase() &&
+    sa.profile.name.toLowerCase()===(gel.profile.name||"").trim().toLowerCase());
+  if(seedHit){
+    T.config.seedGeloescht = T.config.seedGeloescht || [];
+    const key = seedHit.profile.vorname + " " + seedHit.profile.name;
+    if(!T.config.seedGeloescht.includes(key)) T.config.seedGeloescht.push(key);
+  }
   delete T.athleten[id];
   cloudDeleteAthlet(id);
   if(T.activeId===id) T.activeId=Object.keys(T.athleten)[0];
@@ -1588,6 +1599,14 @@ async function cloudPull(initial){
     T.athleten = {};
     rows.forEach(r => { T.athleten[r.key] = Object.assign(defaultAthlete(), r.data || {}); });
     if(team && team.config) T.config = team.config;
+    if(cloudCtx.role === "coach"){
+      // Neue Seed-Athletinnen (App-Updates) in die Cloud uebernehmen
+      const vorher = Object.keys(T.athleten).length;
+      normalizeTeam(T);
+      if(Object.keys(T.athleten).length > vorher){
+        await cloudPushAll();
+      }
+    }
   } else if(initial && cloudCtx.role === "coach"){
     // Erst-Migration: lokales Team in die Cloud hochladen
     await cloudPushAll();
