@@ -511,6 +511,33 @@
   }
   .actions button.primary{background:var(--navy);border-color:var(--navy);color:#fff}
   footer{max-width:680px;margin:0 auto;padding:0 12px 32px;font-size:11px;color:var(--muted)}
+
+  /* ---------- Desktop (Mobile bleibt unverändert) ---------- */
+  @media (min-width:700px){
+    .info-box{width:min(90vw,560px)}
+  }
+  @media (min-width:960px){
+    main{max-width:1010px;padding:16px 24px 48px}
+    .athlete-strip{max-width:1010px;padding-left:24px;padding-right:24px}
+    header{padding-left:24px;padding-right:24px}
+    .tabs button{font-size:14px}
+    #page-form.visible{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+    #page-form details.sec-acc{margin-top:0}
+    #page-form > details:nth-of-type(3),
+    #statsSection,
+    #page-form > details:nth-of-type(7){grid-column:1/-1}
+    .pie-grid{grid-template-columns:repeat(4,1fr)}
+    .pie-cell.total{grid-column:1/-1}
+    #radarWrap svg{max-width:440px}
+    #flowZone svg{max-width:440px}
+    .turn-img{max-width:720px;margin-left:auto;margin-right:auto}
+    #teamList{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+    #teamList .team-card{margin-bottom:0;min-width:0}
+    #teamList .team-card.active{grid-column:1/-1}
+    #page-settings.visible{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+    #page-settings section{margin-top:0}
+    #page-settings section:nth-of-type(3){grid-column:1/-1}
+  }
 </style>
 </head>
 <body>
