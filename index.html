@@ -1625,20 +1625,33 @@ async function cloudPushAll(){
   if(rows.length) await sb.from("athletes").upsert(rows, { onConflict: "team_id,key" });
   await sb.from("teams").update({ config: T.config, updated_at: new Date().toISOString() }).eq("id", cloudCtx.teamId);
 }
-function cloudSchedulePush(){
-  if(!CLOUD() || !cloudCtx) return;
-  clearTimeout(cloudPushT);
-  cloudPushT = setTimeout(async ()=>{
-    const key = T.activeId, A = T.athleten[key];
-    if(!A) return;
-    await sb.from("athletes").upsert({
+async function cloudPushNow(){
+  clearTimeout(cloudPushT); cloudPushT = null;
+  if(!CLOUD() || !cloudCtx || !cloudCtx.teamId || !sb) return;
+  const key = T.activeId, A = T.athleten[key];
+  if(!A) return;
+  let fehler = null;
+  if(cloudCtx.role === "coach"){
+    const r1 = await sb.from("athletes").upsert({
       team_id: cloudCtx.teamId, key,
       email: (A.profile.email||"").toLowerCase() || null,
       data: A, updated_at: new Date().toISOString(),
     }, { onConflict: "team_id,key" });
-    if(cloudCtx.role === "coach")
-      await sb.from("teams").update({ config: T.config, updated_at: new Date().toISOString() }).eq("id", cloudCtx.teamId);
-  }, 900);
+    const r2 = await sb.from("teams").update({ config: T.config, updated_at: new Date().toISOString() }).eq("id", cloudCtx.teamId);
+    fehler = r1.error || r2.error;
+  } else {
+    // Athletin: RLS erlaubt nur UPDATE der eigenen Zeile (kein Insert/Upsert)
+    const { error } = await sb.from("athletes")
+      .update({ data: A, updated_at: new Date().toISOString() })
+      .eq("team_id", cloudCtx.teamId).eq("key", key);
+    fehler = error;
+  }
+  if(fehler) console.warn("GoalsFORGold Cloud-Sync fehlgeschlagen:", fehler.message || fehler);
+}
+function cloudSchedulePush(){
+  if(!CLOUD() || !cloudCtx) return;
+  clearTimeout(cloudPushT);
+  cloudPushT = setTimeout(cloudPushNow, 900);
 }
 async function cloudDeleteAthlet(key){
   if(!CLOUD() || !cloudCtx) return;
@@ -1647,18 +1660,25 @@ async function cloudDeleteAthlet(key){
 async function cloudUpsertAthlet(key){
   if(!CLOUD() || !cloudCtx) return;
   const A = T.athleten[key]; if(!A) return;
-  await sb.from("athletes").upsert({
+  const { error } = await sb.from("athletes").upsert({
     team_id: cloudCtx.teamId, key,
     email: (A.profile.email||"").toLowerCase() || null,
     data: A, updated_at: new Date().toISOString(),
   }, { onConflict: "team_id,key" });
+  if(error) console.warn("GoalsFORGold Cloud-Sync fehlgeschlagen:", error.message || error);
 }
 // Beim Zurückkehren in die App frische Daten holen
-document.addEventListener("visibilitychange", ()=>{
-  if(!document.hidden && CLOUD() && cloudCtx && Date.now() - lastPull > 20000){
+document.addEventListener("visibilitychange", async ()=>{
+  if(document.hidden){
+    if(cloudPushT) cloudPushNow();          // beim Verlassen: offene Änderungen sichern
+    return;
+  }
+  if(CLOUD() && cloudCtx && Date.now() - lastPull > 20000){
+    if(cloudPushT) await cloudPushNow();    // erst sichern, dann aktualisieren
     cloudPull(false);
   }
 });
+window.addEventListener("pagehide", ()=>{ if(cloudPushT) cloudPushNow(); });
 
 /* ---------- Info-Animation ---------- */
 function openInfo(){ $("infoModal").hidden = false; }
